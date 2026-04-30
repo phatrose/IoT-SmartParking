@@ -1,0 +1,13 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: #0f1117;
+  color: #e2e8f0;
+  font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a3650; border-radius: 4px; }
+input, select, button, textarea { font-family: inherit; }
+code { font-family: 'JetBrains Mono', monospace; font-size: .9em; }

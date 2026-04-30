@@ -1,0 +1,189 @@
+// ═══════════════════════════════════════════════════════
+//  Prisma Schema – IoT-SPMS
+//  Database: Microsoft SQL Server (MSSQL)
+//
+//  Run:
+//    npx prisma generate  → tạo TypeScript types
+//    npx prisma db push   → push schema vào DB (tạo bảng)
+//    npm run prisma:seed  → seed mock data
+// ═══════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════ USERS ═══════════════════
+// Sync từ HCMUT_DATACORE (read-only mirror)
+model User {
+  id            Int       @id @default(autoincrement())
+  hcmutId       String    @unique @map("hcmut_id")          // MSSV / Mã GV / Mã NV
+  rfidCard      String    @unique @map("rfid_card")
+  fullName      String    @map("full_name")
+  email         String    @unique
+  phone         String?
+  department    String?
+  role          String    @default("STUDENT")
+  feeTier       String    @default("STANDARD") @map("fee_tier")
+  licensePlate  String?   @map("license_plate")
+  passwordHash  String?   @map("password_hash")             // mock SSO password
+  isActive      Boolean   @default(true) @map("is_active")
+  lastSync      DateTime  @default(now()) @map("last_sync")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  sessions      ParkingSession[]
+  payments      Payment[]
+  issuedTickets VisitorTicket[] @relation("IssuedBy")
+
+  @@index([role])
+  @@index([rfidCard])
+  @@map("users")
+}
+
+// ═══════════════════ PARKING ZONES ═══════════════════
+model ParkingZone {
+  id          Int           @id @default(autoincrement())
+  zoneCode    String        @unique @map("zone_code")     // 'A', 'B', 'C'
+  zoneName    String        @map("zone_name")
+  totalSlots  Int           @default(0) @map("total_slots")
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  slots       ParkingSlot[]
+
+  @@map("parking_zones")
+}
+
+// ═══════════════════ PARKING SLOTS (IoT) ═══════════════════
+model ParkingSlot {
+  id            Int         @id @default(autoincrement())
+  zoneId        Int         @map("zone_id")
+  slotCode      String      @unique @map("slot_code")     // 'A01', 'B15'...
+  sensorId      String?     @unique @map("sensor_id")
+  status        String      @default("AVAILABLE")
+  isFaulty      Boolean     @default(false) @map("is_faulty")
+  rowNumber     Int         @default(1) @map("row_number")
+  lastIotUpdate DateTime    @default(now()) @map("last_iot_update")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  zone          ParkingZone @relation(fields: [zoneId], references: [id])
+  sessions      ParkingSession[]
+
+  @@index([zoneId, status])
+  @@map("parking_slots")
+}
+
+// ═══════════════════ PARKING SESSIONS (entry/exit log) ═══════════════════
+model ParkingSession {
+  id              Int             @id @default(autoincrement())
+  userId          Int?            @map("user_id")
+  visitorTicket   String?         @map("visitor_ticket")
+  slotId          Int?            @map("slot_id")
+  entryGate       String?         @map("entry_gate")
+  exitGate        String?         @map("exit_gate")
+  entryTime       DateTime        @default(now()) @map("entry_time")
+  exitTime        DateTime?       @map("exit_time")
+  durationMinutes Int?            @map("duration_minutes")
+  status          String          @default("ACTIVE")
+  billingPeriod   String?         @map("billing_period")  // 'YYYY-MM'
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  user            User?           @relation(fields: [userId], references: [id])
+  slot            ParkingSlot?    @relation(fields: [slotId], references: [id])
+
+  @@index([userId, status])
+  @@index([billingPeriod])
+  @@map("parking_sessions")
+}
+
+// ═══════════════════ VISITOR TICKETS ═══════════════════
+model VisitorTicket {
+  id            Int       @id @default(autoincrement())
+  ticketCode    String    @unique @map("ticket_code")
+  licensePlate  String    @map("license_plate")
+  vehicleType   String    @default("motorbike") @map("vehicle_type")
+  visitorName   String?   @map("visitor_name")
+  issuedById    Int?      @map("issued_by")
+  entryTime     DateTime  @default(now()) @map("entry_time")
+  expiryTime    DateTime  @map("expiry_time")
+  exitTime      DateTime? @map("exit_time")
+  feeAmount     Decimal   @default(0) @map("fee_amount")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  issuedBy      User?     @relation("IssuedBy", fields: [issuedById], references: [id])
+
+  @@map("visitor_tickets")
+}
+
+// ═══════════════════ PAYMENTS (BKPay) ═══════════════════
+model Payment {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  billingPeriod   String        @map("billing_period")
+  totalDuration   Int           @default(0) @map("total_duration")
+  amount          Decimal       @default(0)
+  status          String        @default("PENDING")
+  bkpayTxnId      String?       @map("bkpay_txn_id")
+  paymentUrl      String?       @map("payment_url")
+  retryCount      Int           @default(0) @map("retry_count")
+  lastError       String?       @map("last_error")
+  paidAt          DateTime?     @map("paid_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@index([userId, billingPeriod])
+  @@index([status])
+  @@map("payments")
+}
+
+// ═══════════════════ PRICING POLICIES (Admin config) ═══════════════════
+model PricingPolicy {
+  id            Int       @id @default(autoincrement())
+  userRole      String    @unique @map("user_role")    // 'student', 'visitor_motorbike'...
+  ratePerHour   Decimal   @default(0) @map("rate_per_hour")
+  dailyCap      Decimal   @default(0) @map("daily_cap")
+  isExempt      Boolean   @default(false) @map("is_exempt")
+  effectiveFrom DateTime  @default(now()) @map("effective_from")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("pricing_policies")
+}
+
+// ═══════════════════ SYSTEM LOG (audit trail) ═══════════════════
+model SystemLog {
+  id          Int       @id @default(autoincrement())
+  eventType   String    @map("event_type")  // 'entry','exit','payment','fault','admin'
+  userId      Int?      @map("user_id")
+  userName    String?   @map("user_name")
+  description String   
+  metadata    String?  
+  ipAddress   String?   @map("ip_address")
+  status      String    @default("OK")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([eventType])
+  @@index([createdAt(sort: Desc)])
+  @@map("system_logs")
+}
+
+// ═══════════════════ PAYMENT QUEUE (BKPay retry) ═══════════════════
+model PaymentJob {
+  id          Int       @id @default(autoincrement())
+  paymentId   Int       @map("payment_id")
+  status      String    @default("PENDING")  // PENDING|RUNNING|DONE|FAILED
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  nextRunAt   DateTime  @default(now()) @map("next_run_at")
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, nextRunAt])
+  @@map("payment_jobs")
+}

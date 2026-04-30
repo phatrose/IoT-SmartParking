@@ -1,0 +1,97 @@
+{
+  "app_name": "Bãi xe Thông minh HCMUT",
+  "login": {
+    "title": "Đăng nhập HCMUT_SSO",
+    "hcmut_id": "Mã HCMUT (MSSV/Mã GV)",
+    "password": "Mật khẩu",
+    "submit": "Đăng nhập",
+    "error_invalid": "Sai thông tin đăng nhập",
+    "demo_accounts": "Tài khoản demo",
+    "loading": "Đang xác thực..."
+  },
+  "nav": {
+    "dashboard": "Tổng quan",
+    "iot_dashboard": "IoT Dashboard",
+    "user_portal": "Cổng Sinh viên",
+    "gate_control": "Cấp vé khách",
+    "admin": "Quản trị",
+    "logout": "Đăng xuất"
+  },
+  "common": {
+    "loading": "Đang tải...",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "search": "Tìm kiếm...",
+    "submit": "Gửi",
+    "live": "TRỰC TIẾP",
+    "updated": "Cập nhật",
+    "no_data": "Không có dữ liệu"
+  },
+  "iot": {
+    "select_zone": "Chọn bãi",
+    "led_board": "Bảng LED",
+    "available": "CÒN CHỖ",
+    "nearly_full": "GẦN ĐẦY",
+    "full": "HẾT CHỖ",
+    "fault_count": "cảm biến lỗi",
+    "mark_fault": "Đánh dấu lỗi",
+    "slot_status": "Trạng thái slot",
+    "selected_slot": "Slot đã chọn",
+    "row": "Dãy"
+  },
+  "user_portal": {
+    "outstanding": "Dư nợ kỳ này",
+    "exempt_label": "MIỄN PHÍ",
+    "duration": "{{minutes}} phút gửi xe",
+    "pay_now": "Thanh toán BKPay",
+    "processing": "Đang xử lý...",
+    "history": "Lịch sử giao dịch",
+    "parking_history": "Lịch sử gửi xe",
+    "exempt_message": "Theo chính sách HCMUT, Giảng viên/Cán bộ được miễn phí gửi xe.",
+    "no_payments": "Chưa có giao dịch",
+    "status": {
+      "PENDING": "Chờ xử lý",
+      "PROCESSING": "Đang xử lý",
+      "SUCCESS": "Thành công",
+      "FAILED": "Thất bại",
+      "REFUNDED": "Hoàn tiền"
+    }
+  },
+  "gate": {
+    "title": "Cấp vé tạm thời",
+    "plate": "Biển số xe",
+    "vehicle_type": "Loại xe",
+    "motorbike": "Xe máy",
+    "car": "Ô tô",
+    "bicycle": "Xe đạp",
+    "visitor_name": "Họ tên khách",
+    "duration_hours": "Thời gian (giờ)",
+    "issue": "Cấp vé",
+    "issued_tickets": "Vé đã cấp",
+    "checkout": "Checkout",
+    "ticket_code": "Mã vé"
+  },
+  "admin": {
+    "pricing_config": "Cấu hình giá vé",
+    "system_log": "Nhật ký hệ thống",
+    "users": "Người dùng",
+    "sync_datacore": "Đồng bộ DATACORE",
+    "report": "Báo cáo",
+    "rate_per_hour": "Giá/giờ (đ)",
+    "daily_cap": "Trần ngày (đ)",
+    "exempt_note": "Giảng viên & Cán bộ: Miễn phí toàn bộ"
+  },
+  "dashboard": {
+    "vehicles_parked": "Xe đang đỗ",
+    "available_slots": "Còn chỗ",
+    "recent_activity": "Hoạt động gần đây",
+    "zone_status": "Tình trạng bãi xe",
+    "total": "Tổng"
+  },
+  "roles": {
+    "STUDENT": "Sinh viên",
+    "STAFF": "Cán bộ",
+    "OPERATOR": "Bảo vệ",
+    "ADMIN": "Quản trị viên"
+  }
+}

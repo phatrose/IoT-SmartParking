@@ -1,0 +1,43 @@
+{
+  "name": "iot-spms-backend",
+  "version": "1.0.0",
+  "description": "IoT-SPMS Backend - NestJS + Prisma + MSSQL",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "db:setup": "npm run prisma:push && npm run prisma:seed"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/core": "^10.3.0",
+    "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/config": "^3.2.0",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/passport": "^10.0.3",
+    "@nestjs/swagger": "^7.3.0",
+    "@nestjs/schedule": "^4.0.0",
+    "@prisma/client": "^5.10.0",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "class-validator": "^0.14.1",
+    "class-transformer": "^0.5.1",
+    "bcryptjs": "^2.4.3",
+    "dayjs": "^1.11.10",
+    "reflect-metadata": "^0.2.1",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.3.2",
+    "@types/node": "^20.11.5",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/bcryptjs": "^2.4.6",
+    "prisma": "^5.10.0",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}

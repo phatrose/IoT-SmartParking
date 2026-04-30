@@ -1,0 +1,97 @@
+{
+  "app_name": "HCMUT Smart Parking",
+  "login": {
+    "title": "HCMUT_SSO Login",
+    "hcmut_id": "HCMUT ID (Student/Staff ID)",
+    "password": "Password",
+    "submit": "Sign In",
+    "error_invalid": "Invalid credentials",
+    "demo_accounts": "Demo accounts",
+    "loading": "Authenticating..."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "iot_dashboard": "IoT Dashboard",
+    "user_portal": "Student Portal",
+    "gate_control": "Gate Control",
+    "admin": "Admin",
+    "logout": "Logout"
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search...",
+    "submit": "Submit",
+    "live": "LIVE",
+    "updated": "Updated",
+    "no_data": "No data"
+  },
+  "iot": {
+    "select_zone": "Select Zone",
+    "led_board": "LED Board",
+    "available": "SPACES",
+    "nearly_full": "NEARLY FULL",
+    "full": "FULL",
+    "fault_count": "faulty sensors",
+    "mark_fault": "Mark Fault",
+    "slot_status": "Slot Status",
+    "selected_slot": "Selected Slot",
+    "row": "Row"
+  },
+  "user_portal": {
+    "outstanding": "Outstanding Balance",
+    "exempt_label": "EXEMPT",
+    "duration": "{{minutes}} minutes parked",
+    "pay_now": "Pay via BKPay",
+    "processing": "Processing...",
+    "history": "Transaction History",
+    "parking_history": "Parking History",
+    "exempt_message": "Per HCMUT policy, Faculty/Staff are exempt from parking fees.",
+    "no_payments": "No transactions yet",
+    "status": {
+      "PENDING": "Pending",
+      "PROCESSING": "Processing",
+      "SUCCESS": "Success",
+      "FAILED": "Failed",
+      "REFUNDED": "Refunded"
+    }
+  },
+  "gate": {
+    "title": "Issue Visitor Ticket",
+    "plate": "License Plate",
+    "vehicle_type": "Vehicle Type",
+    "motorbike": "Motorbike",
+    "car": "Car",
+    "bicycle": "Bicycle",
+    "visitor_name": "Visitor Name",
+    "duration_hours": "Duration (hours)",
+    "issue": "Issue Ticket",
+    "issued_tickets": "Issued Tickets",
+    "checkout": "Checkout",
+    "ticket_code": "Ticket Code"
+  },
+  "admin": {
+    "pricing_config": "Pricing Configuration",
+    "system_log": "System Log",
+    "users": "Users",
+    "sync_datacore": "Sync DATACORE",
+    "report": "Report",
+    "rate_per_hour": "Rate/hour (VND)",
+    "daily_cap": "Daily Cap (VND)",
+    "exempt_note": "Faculty & Staff: Exempt from all fees"
+  },
+  "dashboard": {
+    "vehicles_parked": "Vehicles Parked",
+    "available_slots": "Available",
+    "recent_activity": "Recent Activity",
+    "zone_status": "Zone Status",
+    "total": "Total"
+  },
+  "roles": {
+    "STUDENT": "Student",
+    "STAFF": "Faculty",
+    "OPERATOR": "Operator",
+    "ADMIN": "Administrator"
+  }
+}
