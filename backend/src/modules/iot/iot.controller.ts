@@ -1,7 +1,7 @@
 /**
  * src/modules/iot/iot.controller.ts
  */
-import { Body, Controller, Get, Post, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Param, Query, Headers, UnauthorizedException } from '@nestjs/common';
 import { IsString, IsOptional, IsBoolean, IsIn } from 'class-validator';
 import { IoTService } from './iot.service';
 import { Public } from '../../common/decorators/public.decorator';
@@ -20,11 +20,16 @@ export class IoTController {
 
   /**
    * POST /api/iot/sensor – endpoint cho IoT gateway
-   * Public vì gateway không có JWT (dùng API key trong production)
+   * Dùng API key (x-iot-key header) thay JWT — gateway không có user session
    */
   @Public()
   @Post('sensor')
-  sensorEvent(@Body() dto: SensorEventDto) {
+  sensorEvent(
+    @Body() dto: SensorEventDto,
+    @Headers('x-iot-key') iotKey: string,
+  ) {
+    const expected = process.env.IOT_API_KEY ?? 'iot_spms_dev_key';
+    if (iotKey !== expected) throw new UnauthorizedException('Invalid IoT API key');
     return this.iotService.processSensorEvent(dto);
   }
 

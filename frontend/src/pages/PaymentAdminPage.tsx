@@ -44,15 +44,33 @@ export default function PaymentAdminPage() {
     return p.status === 'SUCCESS' && d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
   }).reduce((s, p) => s + Number(p.amount), 0);
 
-  // Stats by type (mock: billingPeriod present = thanh toán, else nạp tiền)
+  // Stats by type
   const thanhToan = payments.filter(p => p.billingPeriod).reduce((s, p) => s + Number(p.amount), 0);
   const napTien   = totalRevenue - thanhToan > 0 ? totalRevenue - thanhToan : totalRevenue * 0.45;
   const maxStat   = Math.max(thanhToan, napTien) || 1;
 
-  // Trend (mock)
-  const weekTrend  = '+15.2%';
-  const monthTrend = '+8.7%';
-  const avgDaily   = monthRevenue > 0 ? Math.round(monthRevenue / new Date().getDate()) : 0;
+  // Real trend calculations
+  const now2 = new Date();
+  const dow = now2.getDay();
+  const startOfWeek = new Date(now2); startOfWeek.setDate(now2.getDate() - dow); startOfWeek.setHours(0, 0, 0, 0);
+  const startOfLastWeek = new Date(startOfWeek); startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+  const thisWeekRev  = payments.filter(p => p.status === 'SUCCESS' && new Date(p.createdAt) >= startOfWeek).reduce((s, p) => s + Number(p.amount), 0);
+  const lastWeekRev  = payments.filter(p => p.status === 'SUCCESS' && new Date(p.createdAt) >= startOfLastWeek && new Date(p.createdAt) < startOfWeek).reduce((s, p) => s + Number(p.amount), 0);
+
+  const startOfMonth     = new Date(now2.getFullYear(), now2.getMonth(), 1);
+  const startOfLastMonth = new Date(now2.getFullYear(), now2.getMonth() - 1, 1);
+  const thisMonthRev = payments.filter(p => p.status === 'SUCCESS' && new Date(p.createdAt) >= startOfMonth).reduce((s, p) => s + Number(p.amount), 0);
+  const lastMonthRev = payments.filter(p => p.status === 'SUCCESS' && new Date(p.createdAt) >= startOfLastMonth && new Date(p.createdAt) < startOfMonth).reduce((s, p) => s + Number(p.amount), 0);
+
+  const fmtTrend = (cur: number, prev: number) =>
+    prev > 0 ? `${cur >= prev ? '+' : ''}${(((cur - prev) / prev) * 100).toFixed(1)}%` : (cur > 0 ? 'Mới' : '—');
+
+  const weekTrend      = fmtTrend(thisWeekRev, lastWeekRev);
+  const weekPositive   = lastWeekRev > 0 ? thisWeekRev >= lastWeekRev : (thisWeekRev > 0 ? true : null);
+  const monthTrend     = fmtTrend(thisMonthRev, lastMonthRev);
+  const monthPositive  = lastMonthRev > 0 ? thisMonthRev >= lastMonthRev : (thisMonthRev > 0 ? true : null);
+  const avgDaily       = monthRevenue > 0 ? Math.round(monthRevenue / now2.getDate()) : 0;
 
   return (
     <div>
@@ -111,7 +129,7 @@ export default function PaymentAdminPage() {
                 <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
                   Không có giao dịch nào
                 </td></tr>
-              ) : filtered.slice(0, 50).map((p, i) => {
+              ) : filtered.slice(0, 50).map((p) => {
                 const st = STATUS_STYLE[p.status] ?? STATUS_STYLE['PENDING'];
                 const txnId = p.bkpayTxnId ? `TXN-${String(p.id).padStart(3, '0')}` : `TXN-${String(p.id).padStart(3,'0')}`;
                 const date = new Date(p.createdAt).toLocaleDateString('vi-VN', {
@@ -167,8 +185,8 @@ export default function PaymentAdminPage() {
         <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '18px 20px' }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Xu hướng giao dịch</div>
           {[
-            { label: 'Tuần này',       value: weekTrend,           positive: true },
-            { label: 'Tháng này',      value: monthTrend,          positive: true },
+            { label: 'Tuần này',       value: weekTrend,           positive: weekPositive },
+            { label: 'Tháng này',      value: monthTrend,          positive: monthPositive },
             { label: 'Trung bình/ngày',value: fmtMoney(avgDaily),  positive: null },
           ].map(({ label, value, positive }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',

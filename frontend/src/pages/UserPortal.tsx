@@ -3,7 +3,6 @@
  * Cổng cá nhân cho Sinh viên / Cán bộ – xem dư nợ + thanh toán BKPay
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { billingApi, parkingApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,8 +11,17 @@ const STATUS_COLOR: Record<string, string> = {
   FAILED: '#ef4444', REFUNDED: '#94a3b8',
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Chờ xử lý', PROCESSING: 'Đang xử lý',
+  SUCCESS: 'Thành công', FAILED: 'Thất bại', REFUNDED: 'Hoàn tiền',
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  STUDENT: 'Sinh viên', STAFF: 'Cán bộ',
+  ADMIN: 'Quản trị viên', OPERATOR: 'Nhân viên',
+};
+
 export default function UserPortal() {
-  const { t } = useTranslation();
   const { user } = useAuth();
   const [summary, setSummary] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -57,7 +65,7 @@ export default function UserPortal() {
     }
   };
 
-  if (!summary) return <div style={{ color: '#64748b', padding: 20 }}>{t('common.loading')}</div>;
+  if (!summary) return <div style={{ color: '#64748b', padding: 20 }}>Đang tải...</div>;
 
   const pending = summary.payments.filter((p: any) => p.status === 'PENDING' || p.status === 'PROCESSING');
   const totalPending = pending.reduce((s: number, p: any) => s + Number(p.amount), 0);
@@ -75,14 +83,14 @@ export default function UserPortal() {
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>{user?.fullName}</div>
           <div style={{ fontSize: 11, color: '#64748b' }}>
-            {user?.hcmutId} · {t('roles.' + user?.role)} · {user?.licensePlate || '—'}
+            {user?.hcmutId} · {ROLE_LABEL[user?.role ?? ''] ?? user?.role} · {user?.licensePlate || '—'}
           </div>
         </div>
         <span style={{
           padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
           background: isExempt ? 'rgba(34,197,94,.15)' : 'rgba(59,130,246,.15)',
           color: isExempt ? '#22c55e' : '#3b82f6',
-        }}>{isExempt ? '✅ ' + t('user_portal.exempt_label') : '💳 STANDARD'}</span>
+        }}>{isExempt ? '✅ Miễn phí' : '💳 STANDARD'}</span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 14 }}>
@@ -95,14 +103,14 @@ export default function UserPortal() {
             borderRadius: 12, padding: 22, color: '#fff', marginBottom: 14,
           }}>
             <div style={{ fontSize: 11, opacity: .8 }}>
-              {t('user_portal.outstanding')} – {summary.currentPeriod}
+              Dư nợ – {summary.currentPeriod}
             </div>
             <div style={{ fontSize: 36, fontWeight: 800, fontFamily: 'monospace', margin: '6px 0' }}>
-              {isExempt ? t('user_portal.exempt_label') :
+              {isExempt ? 'Miễn phí' :
                totalPending > 0 ? `${totalPending.toLocaleString('vi-VN')}đ` : '0đ'}
             </div>
             <div style={{ fontSize: 11, opacity: .85 }}>
-              {t('user_portal.duration', { minutes: summary.durationMinutes })}
+              Tổng thời gian: {summary.durationMinutes} phút
             </div>
           </div>
 
@@ -131,7 +139,7 @@ export default function UserPortal() {
                         color: '#fff', border: 'none', fontSize: 12, fontWeight: 600,
                         cursor: paying === p.id ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
                       }}>
-                      {paying === p.id ? t('user_portal.processing') : '💳 ' + t('user_portal.pay_now')}
+                      {paying === p.id ? 'Đang xử lý...' : '💳 Thanh toán ngay'}
                     </button>
                   </div>
                 </div>
@@ -142,7 +150,7 @@ export default function UserPortal() {
           {isExempt && (
             <div style={{ background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.2)',
               borderRadius: 10, padding: 16, color: '#22c55e', fontSize: 13 }}>
-              ✅ {t('user_portal.exempt_message')}
+              ✅ Tài khoản được miễn phí gửi xe
             </div>
           )}
         </div>
@@ -170,12 +178,12 @@ export default function UserPortal() {
 
           <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 10, overflow: 'hidden' }}>
             <div style={{ padding: '11px 14px', borderBottom: '1px solid #2a3650', fontWeight: 600, fontSize: 13 }}>
-              {t('user_portal.history')}
+              Lịch sử thanh toán
             </div>
             <div style={{ maxHeight: 280, overflowY: 'auto' }}>
               {summary.payments.length === 0 ?
                 <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 12 }}>
-                  {t('user_portal.no_payments')}
+                  Chưa có thanh toán
                 </div> :
                 summary.payments.map((p: any) => (
                   <div key={p.id} style={{ padding: '11px 14px', borderBottom: '1px solid rgba(42,54,80,.4)',
@@ -193,7 +201,7 @@ export default function UserPortal() {
                       <span style={{
                         padding: '2px 7px', borderRadius: 20, fontSize: 10, fontWeight: 500,
                         background: `${STATUS_COLOR[p.status]}20`, color: STATUS_COLOR[p.status],
-                      }}>{t(`user_portal.status.${p.status}`)}</span>
+                      }}>{STATUS_LABEL[p.status] ?? p.status}</span>
                     </div>
                   </div>
                 ))
@@ -206,7 +214,7 @@ export default function UserPortal() {
       {/* Parking history */}
       <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 10, overflow: 'hidden', marginTop: 14 }}>
         <div style={{ padding: '11px 14px', borderBottom: '1px solid #2a3650', fontWeight: 600, fontSize: 13 }}>
-          {t('user_portal.parking_history')}
+          Lịch sử gửi xe
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
@@ -221,7 +229,7 @@ export default function UserPortal() {
             <tbody>
               {history.length === 0 ?
                 <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>
-                  {t('common.no_data')}
+                  Không có dữ liệu
                 </td></tr> :
                 history.slice(0, 20).map((s: any) => (
                   <tr key={s.id} style={{ borderBottom: '1px solid rgba(42,54,80,.4)' }}>

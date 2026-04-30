@@ -11,3 +11,14 @@ body {
 ::-webkit-scrollbar-thumb { background: #2a3650; border-radius: 4px; }
 input, select, button, textarea { font-family: inherit; }
 code { font-family: 'JetBrains Mono', monospace; font-size: .9em; }
+
+@keyframes skshimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+.sk {
+  background: linear-gradient(90deg, #1c2333 25%, #253047 50%, #1c2333 75%);
+  background-size: 1200px 100%;
+  animation: skshimmer 1.5s infinite linear;
+  border-radius: 6px;
+}

@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../config/prisma.service';
+import * as bcrypt from 'bcrypt';
 import dayjs from 'dayjs';
 
 @Injectable()
@@ -62,6 +63,65 @@ export class AdminService {
       const status = !u.isActive ? 'BLOCKED' : balance > 100000 ? 'WARNING' : 'ACTIVE';
       return { ...u, balance, status };
     });
+  }
+
+  // ─── User CRUD ───
+  async createUser(data: {
+    hcmutId: string; fullName: string; email?: string; phone?: string;
+    role: string; password: string; licensePlate?: string; department?: string;
+  }, adminId: number) {
+    const exists = await this.prisma.user.findUnique({ where: { hcmutId: data.hcmutId } });
+    if (exists) throw new ConflictException(`HCMUT ID ${data.hcmutId} đã tồn tại`);
+    const hash = await bcrypt.hash(data.password, 10);
+    const user = await this.prisma.user.create({
+      data: {
+        hcmutId: data.hcmutId, fullName: data.fullName, email: data.email,
+        phone: data.phone, role: data.role as any, passwordHash: hash,
+        licensePlate: data.licensePlate, department: data.department,
+        feeTier: data.role, isActive: true, rfidCard: '',
+      },
+    });
+    await this.prisma.systemLog.create({
+      data: { eventType: 'admin', userId: adminId, userName: 'Admin', description: `Tạo user mới: ${data.hcmutId} (${data.role})` },
+    });
+    return { success: true, user };
+  }
+
+  async updateUser(id: number, data: {
+    fullName?: string; email?: string; phone?: string;
+    licensePlate?: string; department?: string; isActive?: boolean; role?: string;
+  }, adminId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User không tồn tại');
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { ...data, role: data.role as any },
+    });
+    await this.prisma.systemLog.create({
+      data: { eventType: 'admin', userId: adminId, userName: 'Admin', description: `Cập nhật user: ${user.hcmutId}` },
+    });
+    return { success: true, user: updated };
+  }
+
+  async deleteUser(id: number, adminId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User không tồn tại');
+    await this.prisma.user.update({ where: { id }, data: { isActive: false } });
+    await this.prisma.systemLog.create({
+      data: { eventType: 'admin', userId: adminId, userName: 'Admin', description: `Vô hiệu hóa user: ${user.hcmutId}` },
+    });
+    return { success: true };
+  }
+
+  async resetPassword(id: number, newPassword: string, adminId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User không tồn tại');
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id }, data: { passwordHash: hash } });
+    await this.prisma.systemLog.create({
+      data: { eventType: 'admin', userId: adminId, userName: 'Admin', description: `Reset mật khẩu: ${user.hcmutId}` },
+    });
+    return { success: true };
   }
 
   // ─── Sync DATACORE (mock) ───
@@ -145,6 +205,24 @@ export class AdminService {
       ? Math.round(monthlySessions.reduce((s, x) => s + (x.durationMinutes ?? 0), 0) / monthlySessions.length)
       : 0;
 
+    // Peak hours from real data: count entries per hour, find top 2-hour window
+    const hourCounts = new Array(24).fill(0);
+    monthlySessions.forEach(s => { hourCounts[new Date(s.entryTime).getHours()]++; });
+
+    let peak1H = 7, peak1Score = -1, peak2H = 16, peak2Score = -1;
+    for (let h = 0; h <= 22; h++) {
+      const score = hourCounts[h] + hourCounts[h + 1];
+      if (score > peak1Score) {
+        if (Math.abs(h - peak1H) > 1) { peak2H = peak1H; peak2Score = peak1Score; }
+        peak1H = h; peak1Score = score;
+      } else if (score > peak2Score && Math.abs(h - peak1H) > 1) {
+        peak2H = h; peak2Score = score;
+      }
+    }
+    const fmtH = (h: number) => `${String(h).padStart(2, '0')}:00`;
+    const peakHours  = monthlySessions.length > 0 ? `${fmtH(peak1H)} – ${fmtH(peak1H + 2)}` : '07:00 – 09:00';
+    const peakHours2 = monthlySessions.length > 0 ? `${fmtH(peak2H)} – ${fmtH(peak2H + 2)}` : '16:00 – 18:00';
+
     return {
       period,
       sessions: { count: sessAgg._count.id, total_minutes: sessAgg._sum.durationMinutes ?? 0 },
@@ -158,6 +236,8 @@ export class AdminService {
       topUsers,
       visitorCount,
       avgDuration,
+      peakHours,
+      peakHours2,
     };
   }
 

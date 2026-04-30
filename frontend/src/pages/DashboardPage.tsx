@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { adminApi } from '../services/api';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 
 interface ZoneStat { zone_code: string; total: number; available: number; }
 interface ChartPoint { label: string; date: string; count: number; }
@@ -35,8 +36,46 @@ export default function DashboardPage() {
   }, [load]);
 
   if (!data) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#64748b' }}>
-      Đang tải...
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <Skeleton width={120} height={24} />
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Skeleton width={180} height={34} />
+          <Skeleton width={34} height={34} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+        {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '18px 20px' }}>
+            <Skeleton width="40%" height={14} style={{ marginBottom: 8 }} />
+            <Skeleton width="30%" height={10} style={{ marginBottom: 20 }} />
+            <Skeleton width="100%" height={180} borderRadius={8} />
+          </div>
+          <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '18px 20px' }}>
+            <Skeleton width="35%" height={14} style={{ marginBottom: 16 }} />
+            {[0,1,2,3,4].map(i => (
+              <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+                <Skeleton width={60} height={12} />
+                <Skeleton width="30%" height={12} />
+                <Skeleton width="20%" height={12} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '16px 18px' }}>
+            <Skeleton width="60%" height={14} style={{ marginBottom: 14 }} />
+            {[0,1,2].map(i => <Skeleton key={i} width="100%" height={12} style={{ marginBottom: 14 }} />)}
+          </div>
+          <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '16px 18px' }}>
+            <Skeleton width="50%" height={14} style={{ marginBottom: 12 }} />
+            {[0,1,2,3].map(i => <Skeleton key={i} width="100%" height={48} borderRadius={8} style={{ marginBottom: 8 }} />)}
+          </div>
+        </div>
+      </div>
     </div>
   );
 

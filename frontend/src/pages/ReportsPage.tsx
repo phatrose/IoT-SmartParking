@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { jsPDF } from 'jspdf';
 import { adminApi } from '../services/api';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 
 const PERIODS = ['Tháng', 'Tuần', 'Quý', 'Năm'] as const;
 type PeriodTab = typeof PERIODS[number];
@@ -30,12 +32,30 @@ function exportPDF(data: any, period: string) {
     '',
     'Top người dùng:',
     ...(data.topUsers ?? []).map((u: any, i: number) =>
-      `${i + 1}. ${u.fullName} (${u.hcmutId}) - ${u.sessions} lượt - ${fmtMoney(u.amount)}`
+      `${i + 1}. ${u.fullName} (${u.hcmutId}) - ${u.sessions} luot - ${fmtMoney(u.amount)}`
     ),
   ];
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `BaoCao_${period}.txt`; a.click();
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const lh = 8; let y = 20;
+  const ln = (txt: string, size = 11, bold = false) => {
+    doc.setFontSize(size); doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.text(txt, 15, y); y += lh;
+  };
+  const div = () => { doc.setDrawColor(180); doc.line(15, y, 195, y); y += 5; };
+
+  ln('BAO CAO THONG KE BAI XE - HCMUT', 16, true);
+  ln(`Ky: ${period}  |  Xuat ngay: ${new Date().toLocaleDateString('vi-VN')}`, 10);
+  y += 3; div();
+  ln('TONG QUAN', 12, true);
+  lines.slice(1, 5).forEach(l => ln(l));
+  y += 3; div();
+  ln('TOP NGUOI DUNG', 12, true);
+  lines.slice(7).forEach(l => ln(l));
+  y += 3; div();
+  ln('Bao cao duoc tao tu he thong Smart Parking HCMUT', 9);
+
+  doc.save(`BaoCao_${period}.pdf`);
 }
 
 export default function ReportsPage() {
@@ -59,6 +79,8 @@ export default function ReportsPage() {
   const revenue   = data?.revenue?.amount   ?? 0;
   const avgDur    = data?.avgDuration       ?? 0;
   const visitors  = data?.visitorCount      ?? 0;
+  const peakHours  = data?.peakHours  ?? '07:00 – 09:00';
+  const peakHours2 = data?.peakHours2 ?? '16:00 – 18:00';
   const chartTotal = chart.reduce((s, d) => s + d.count, 0);
   const displayPeriod = tab === 'Tháng'
     ? `Tháng ${period.split('-')[1]}/${period.split('-')[0]}` : period;
@@ -95,7 +117,26 @@ export default function ReportsPage() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign:'center', padding: 60, color:'#64748b' }}>Đang tải...</div>
+        <>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+            {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 260px', gap: 14, marginBottom: 14 }}>
+            <div style={{ background:'#1c2333', border:'1px solid #2a3650', borderRadius: 12, padding:'18px 20px' }}>
+              <Skeleton width="35%" height={14} style={{ marginBottom: 8 }} />
+              <Skeleton width="25%" height={10} style={{ marginBottom: 20 }} />
+              <Skeleton width="100%" height={200} borderRadius={8} />
+            </div>
+            <div style={{ background:'#1c2333', border:'1px solid #2a3650', borderRadius: 12, padding:'18px 20px' }}>
+              <Skeleton width="60%" height={14} style={{ marginBottom: 20 }} />
+              {[0,1,2].map(i => <Skeleton key={i} width="100%" height={28} style={{ marginBottom: 14 }} />)}
+            </div>
+          </div>
+          <div style={{ background:'#1c2333', border:'1px solid #2a3650', borderRadius: 12, padding:'18px 20px' }}>
+            <Skeleton width="40%" height={14} style={{ marginBottom: 16 }} />
+            {[0,1,2,3,4].map(i => <Skeleton key={i} width="100%" height={44} style={{ marginBottom: 8 }} borderRadius={8} />)}
+          </div>
+        </>
       ) : (
         <>
           {/* Stat cards */}
@@ -155,8 +196,8 @@ export default function ReportsPage() {
               })}
               <div style={{ marginTop: 14, padding:'10px 12px', background:'#222b3a', borderRadius: 8 }}>
                 <div style={{ fontSize: 11, color:'#64748b', marginBottom: 4 }}>Giờ cao điểm</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>07:00 – 09:00</div>
-                <div style={{ fontSize: 11, color:'#64748b' }}>Và 16:30 – 18:30</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{peakHours}</div>
+                <div style={{ fontSize: 11, color:'#64748b' }}>Và {peakHours2}</div>
               </div>
             </div>
           </div>

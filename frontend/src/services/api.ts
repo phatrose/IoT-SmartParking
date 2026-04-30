@@ -57,7 +57,7 @@ export const iotApi = {
   getAllSlots: (zone?: string) => api.get('/api/iot/slots', { params: zone ? { zone } : {} }),
   getLed: (zone: string) => api.get(`/api/iot/led/${zone}`),
   markFault: (sensorId: string) => api.post(`/api/iot/sensor/${sensorId}/fault`),
-  sensorEvent: (data: any) => api.post('/api/iot/sensor', data),
+  sensorEvent: (data: any) => api.post('/api/iot/sensor', data, { headers: { 'x-iot-key': 'iot_spms_dev_key' } }),
 };
 
 export const billingApi = {
@@ -73,6 +73,10 @@ export const adminApi = {
   upsertPricing: (data: any) => api.put('/api/admin/pricing', data),
   getLogs: (params?: any) => api.get('/api/admin/logs', { params }),
   getUsers: (params?: any) => api.get('/api/admin/users', { params }),
+  createUser: (data: any) => api.post('/api/admin/users', data),
+  updateUser: (id: number, data: any) => api.put(`/api/admin/users/${id}`, data),
+  deleteUser: (id: number) => api.delete(`/api/admin/users/${id}`),
+  resetPassword: (id: number, newPassword: string) => api.post(`/api/admin/users/${id}/reset-password`, { newPassword }),
   syncDatacore: () => api.post('/api/admin/sync-datacore'),
   getReport: (period: string) => api.get('/api/admin/report', { params: { period } }),
 };
