@@ -8,6 +8,16 @@ const PERIODS = ['Tháng', 'Tuần', 'Quý', 'Năm'] as const;
 type PeriodTab = typeof PERIODS[number];
 const ZONE_COLOR: Record<string, string> = { A: '#3b82f6', B: '#f59e0b', C: '#ef4444' };
 
+function useIsMobile(bp = 640) {
+  const [m, setM] = useState(() => window.innerWidth < bp);
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < bp);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, [bp]);
+  return m;
+}
+
 function fmtMoney(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M đ`;
   return `${n.toLocaleString('vi-VN')}đ`;
@@ -20,6 +30,25 @@ function getPeriodParam(tab: PeriodTab): string {
   if (tab === 'Tuần')  { const d = new Date(now); d.setDate(d.getDate() - d.getDay()); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
   if (tab === 'Quý')   return `${now.getFullYear()}-${String(Math.floor(now.getMonth()/3)*3+1).padStart(2,'0')}`;
   return `${now.getFullYear()}-01`;
+}
+
+function exportCSV(data: any, period: string) {
+  const rows: (string | number)[][] = [
+    ['Ngay', 'Luot xe'],
+    ...(data.dailyChart ?? []).map((d: any) => [d.day, d.count]),
+    [],
+    ['MSSV', 'Ho ten', 'Vai tro', 'Luot xe', 'Tong gio', 'Tong phi (VND)'],
+    ...(data.topUsers ?? []).map((u: any) => [
+      u.hcmutId, u.fullName, u.role, u.sessions,
+      Math.round(u.durationMinutes / 60), u.amount,
+    ]),
+  ];
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `BaoCao_${period}.csv`;
+  a.click();
 }
 
 function exportPDF(data: any, period: string) {
@@ -59,15 +88,17 @@ function exportPDF(data: any, period: string) {
 }
 
 export default function ReportsPage() {
+  const mobile = useIsMobile();
   const [tab, setTab]     = useState<PeriodTab>('Tháng');
   const [data, setData]   = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [apiErr, setApiErr] = useState('');
   const period = getPeriodParam(tab);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const { data: d } = await adminApi.getReport(period); setData(d); }
-    catch {} finally { setLoading(false); }
+    try { const { data: d } = await adminApi.getReport(period); setData(d); setApiErr(''); }
+    catch { setApiErr('Không thể tải báo cáo'); } finally { setLoading(false); }
   }, [period]);
 
   useEffect(() => { load(); }, [load]);
@@ -90,12 +121,17 @@ export default function ReportsPage() {
 
   return (
     <div>
+      {apiErr && <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 12, color: '#ef4444' }}>⚠ {apiErr}</div>}
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Báo cáo Thống kê</h1>
         <div style={{ display:'flex', gap: 10, alignItems:'center' }}>
           <div style={{ background:'#1c2333', border:'1px solid #2a3650', borderRadius: 8,
             padding:'7px 14px', fontSize: 12, color:'#94a3b8' }}>{displayPeriod}</div>
+          <button onClick={() => data && exportCSV(data, period)} style={{
+            padding:'8px 18px', background:'#222b3a', border:'1px solid #2a3650', borderRadius: 8,
+            color:'#94a3b8', fontSize: 12, fontWeight: 600, cursor:'pointer', fontFamily:'inherit',
+          }}>Xuất CSV</button>
           <button onClick={() => data && exportPDF(data, period)} style={{
             padding:'8px 18px', background:'#3b82f6', border:'none', borderRadius: 8,
             color:'#fff', fontSize: 12, fontWeight: 600, cursor:'pointer', fontFamily:'inherit',
@@ -118,10 +154,10 @@ export default function ReportsPage() {
 
       {loading ? (
         <>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+          <div style={{ display:'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
             {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 260px', gap: 14, marginBottom: 14 }}>
+          <div style={{ display:'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 260px', gap: 14, marginBottom: 14 }}>
             <div style={{ background:'#1c2333', border:'1px solid #2a3650', borderRadius: 12, padding:'18px 20px' }}>
               <Skeleton width="35%" height={14} style={{ marginBottom: 8 }} />
               <Skeleton width="25%" height={10} style={{ marginBottom: 20 }} />
@@ -140,7 +176,7 @@ export default function ReportsPage() {
       ) : (
         <>
           {/* Stat cards */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+          <div style={{ display:'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
             {[
               { label:'Tổng lượt gửi xe', value: sessions.toString(),      color:'#3b82f6' },
               { label:'Doanh thu tháng',  value: fmtMoney(revenue),         color:'#22c55e' },
@@ -156,7 +192,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Chart + zone usage */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 260px', gap: 14, marginBottom: 14 }}>
+          <div style={{ display:'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 260px', gap: 14, marginBottom: 14 }}>
             {/* Bar chart */}
             <div style={{ background:'#1c2333', border:'1px solid #2a3650', borderRadius: 12, padding:'18px 20px' }}>
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Lượt xe theo ngày</div>

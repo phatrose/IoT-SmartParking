@@ -1,10 +1,6 @@
-/**
- * src/pages/IoTDashboard.tsx
- * UC-3: Operator real-time slot monitoring + LED board
- */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 import { iotApi } from '../services/api';
+import { Skeleton } from '../components/Skeleton';
 
 interface Slot {
   id: number;
@@ -25,13 +21,24 @@ interface LedState {
 
 const LED_COLOR = { OK: '#00ff88', NEARLY_FULL: '#ffaa00', FULL: '#ff3333', UNKNOWN: '#555' };
 
+function useIsMobile(bp = 640) {
+  const [m, setM] = useState(() => window.innerWidth < bp);
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < bp);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, [bp]);
+  return m;
+}
+
 export default function IoTDashboard() {
-  const { t } = useTranslation();
+  const mobile = useIsMobile();
   const [slots, setSlots]       = useState<Slot[]>([]);
   const [leds, setLeds]         = useState<Record<string, LedState>>({});
   const [zone, setZone]         = useState('A');
   const [selected, setSelected] = useState<Slot | null>(null);
   const [last, setLast]         = useState('');
+  const [apiErr, setApiErr]     = useState('');
   const pollRef = useRef<any>();
 
   const fetchAll = useCallback(async () => {
@@ -43,7 +50,8 @@ export default function IoTDashboard() {
       setSlots(slotRes.data);
       setLeds({ A: ledRes[0].data, B: ledRes[1].data, C: ledRes[2].data });
       setLast(new Date().toLocaleTimeString('vi-VN'));
-    } catch (e) {}
+      setApiErr('');
+    } catch { setApiErr('Không thể tải dữ liệu IoT'); }
   }, []);
 
   useEffect(() => {
@@ -63,19 +71,44 @@ export default function IoTDashboard() {
     fetchAll();
   };
 
+  if (slots.length === 0 && !apiErr) return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '160px 1fr 200px', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[0,1,2].map(i => <Skeleton key={i} width="100%" height={60} borderRadius={8} />)}
+        </div>
+        <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 10, padding: 14 }}>
+          <Skeleton width="30%" height={14} style={{ marginBottom: 16 }} />
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ marginBottom: 10 }}>
+              <Skeleton width="20%" height={10} style={{ marginBottom: 6 }} />
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {[0,1,2,3,4,5,6,7].map(j => <Skeleton key={j} width={54} height={32} borderRadius={6} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 10, padding: 14 }}>
+          <Skeleton width="100%" height={120} borderRadius={10} />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div>
+      {apiErr && <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 12, color: '#ef4444' }}>⚠ {apiErr}</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span style={{ display: 'inline-flex', gap: 5, alignItems: 'center', fontSize: 12, color: '#22c55e', fontWeight: 600 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />{t('common.live')}
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />Live
           </span>
-          <span style={{ fontSize: 11, color: '#64748b' }}>{t('common.updated')}: {last}</span>
+          <span style={{ fontSize: 11, color: '#64748b' }}>Cập nhật: {last}</span>
           {faulty > 0 && (
             <span style={{
               padding: '3px 9px', borderRadius: 20, fontSize: 11, color: '#f59e0b',
               background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)',
-            }}>⚠ {faulty} {t('iot.fault_count')}</span>
+            }}>⚠ {faulty} cảm biến lỗi</span>
           )}
         </div>
         {selected && (
@@ -83,15 +116,20 @@ export default function IoTDashboard() {
             padding: '7px 14px', borderRadius: 7, background: 'rgba(245,158,11,.15)',
             border: '1px solid rgba(245,158,11,.3)', color: '#f59e0b',
             cursor: 'pointer', fontSize: 12, fontFamily: 'inherit',
-          }}>⚠ {t('iot.mark_fault')}: {selected.slotCode}</button>
+          }}>⚠ Đánh dấu lỗi: {selected.slotCode}</button>
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 200px', gap: 12, minHeight: 'calc(100vh - 120px)' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: mobile ? '1fr' : '160px 1fr 200px',
+        gap: 12,
+        minHeight: mobile ? undefined : 'calc(100vh - 120px)',
+      }}>
         {/* Zone selector */}
-        <div>
-          <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .8 }}>
-            {t('iot.select_zone')}
+        <div style={{ display: mobile ? 'flex' : 'block', gap: mobile ? 8 : undefined, flexWrap: 'wrap', alignItems: mobile ? 'flex-start' : undefined }}>
+          <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .8, width: mobile ? '100%' : undefined }}>
+            Chọn bãi
           </div>
           {['A', 'B', 'C'].map(z => {
             const ledZ = leds[z];
@@ -103,7 +141,9 @@ export default function IoTDashboard() {
                 style={{
                   background: zone === z ? 'rgba(59,130,246,.12)' : '#1c2333',
                   border: `1px solid ${zone === z ? '#3b82f6' : '#2a3650'}`,
-                  borderRadius: 8, padding: '10px 12px', cursor: 'pointer', marginBottom: 8,
+                  borderRadius: 8, padding: '10px 12px', cursor: 'pointer',
+                  marginBottom: mobile ? 0 : 8,
+                  flex: mobile ? '1 1 80px' : undefined,
                 }}>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>Bãi {z}</div>
                 <div style={{ fontSize: 11, color, marginTop: 2 }}>{ledZ.available}/{ledZ.total}</div>
@@ -115,14 +155,16 @@ export default function IoTDashboard() {
           })}
 
           {/* Legend */}
-          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[['#22c55e', 'Trống'], ['#ef4444', 'Có xe'], ['#f59e0b', 'Lỗi']].map(([c, l]) => (
-              <div key={l} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: '#64748b' }}>
-                <div style={{ width: 10, height: 10, borderRadius: 3, background: `${c}20`, border: `1px solid ${c}` }} />
-                {l}
-              </div>
-            ))}
-          </div>
+          {!mobile && (
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[['#22c55e', 'Trống'], ['#ef4444', 'Có xe'], ['#f59e0b', 'Lỗi']].map(([c, l]) => (
+                <div key={l} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: '#64748b' }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 3, background: `${c}20`, border: `1px solid ${c}` }} />
+                  {l}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Slot grid */}
@@ -130,14 +172,14 @@ export default function IoTDashboard() {
           <div style={{ padding: '11px 14px', borderBottom: '1px solid #2a3650', display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, fontSize: 13 }}>Bãi {zone}</span>
             <span style={{ fontSize: 11, color: '#64748b' }}>
-              {zoneSlots.filter(s => s.status === 'AVAILABLE' && !s.isFaulty).length} {t('iot.available').toLowerCase()} / {zoneSlots.length}
+              {zoneSlots.filter(s => s.status === 'AVAILABLE' && !s.isFaulty).length} trống / {zoneSlots.length}
             </span>
           </div>
-          <div style={{ padding: 14, overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+          <div style={{ padding: 14, overflowY: 'auto', maxHeight: mobile ? 360 : 'calc(100vh - 200px)' }}>
             {rows.map((r, ri) => (
               <div key={r}>
                 <div style={{ fontSize: 10, color: '#64748b', marginBottom: 5, marginTop: ri > 0 ? 10 : 0 }}>
-                  {t('iot.row')} {r}
+                  Dãy {r}
                 </div>
                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                   {zoneSlots.filter(s => s.rowNumber === r).map(s => {
@@ -172,16 +214,17 @@ export default function IoTDashboard() {
         </div>
 
         {/* LED + detail */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: mobile ? 'row' : 'column', gap: 10, flexWrap: 'wrap' }}>
           <div style={{
             background: '#0d1117', border: '3px solid #1e2d45', borderRadius: 14,
-            padding: '20px 16px', textAlign: 'center',
+            padding: mobile ? '14px 20px' : '20px 16px', textAlign: 'center',
+            flex: mobile ? '0 0 auto' : undefined,
           }}>
             <div style={{ fontSize: 10, color: '#555', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 8 }}>
               BÃI {led.zone}
             </div>
             <div style={{
-              fontSize: 56, fontWeight: 800, lineHeight: 1, fontFamily: 'monospace',
+              fontSize: mobile ? 40 : 56, fontWeight: 800, lineHeight: 1, fontFamily: 'monospace',
               color: LED_COLOR[led.state], textShadow: `0 0 18px ${LED_COLOR[led.state]}`,
             }}>{led.available}</div>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, marginTop: 6, color: LED_COLOR[led.state] }}>
@@ -193,9 +236,9 @@ export default function IoTDashboard() {
           </div>
 
           {selected && (
-            <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 10, padding: 14 }}>
+            <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 10, padding: 14, flex: mobile ? '1 1 160px' : undefined }}>
               <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8, textTransform: 'uppercase' }}>
-                {t('iot.selected_slot')}
+                Slot đang chọn
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'monospace', marginBottom: 6,
                 color: selected.isFaulty ? '#f59e0b' : selected.status === 'AVAILABLE' ? '#22c55e' : '#ef4444' }}>

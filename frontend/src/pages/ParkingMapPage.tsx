@@ -59,7 +59,18 @@ const SLOT_BG = (s: Slot, selected: boolean, isMySlot: boolean) => {
 
 type FilterKey = 'available' | 'occupied' | 'mine';
 
+function useIsMobile(bp = 640) {
+  const [m, setM] = useState(() => window.innerWidth < bp);
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < bp);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, [bp]);
+  return m;
+}
+
 export default function ParkingMapPage() {
+  const mobile = useIsMobile();
   const { user } = useAuth();
   const isOperator = user?.role === 'OPERATOR' || user?.role === 'ADMIN';
   const isStudent  = user?.role === 'STUDENT' || user?.role === 'STAFF';
@@ -75,6 +86,7 @@ export default function ParkingMapPage() {
   const [reserving, setReserving]   = useState(false);
   const [faultMsg, setFaultMsg]     = useState('');
   const [now, setNow]               = useState(new Date());
+  const [apiErr, setApiErr]         = useState('');
   const pollRef = useRef<any>();
 
   // Cập nhật "now" mỗi 30s để phí/lượt hiển thị đúng
@@ -99,7 +111,8 @@ export default function ParkingMapPage() {
           setActive(data);
         } catch { setActive(null); }
       }
-    } catch {}
+      setApiErr('');
+    } catch { setApiErr('Không thể tải dữ liệu bãi xe'); }
   }, [isOperator]);
 
   useEffect(() => {
@@ -160,7 +173,9 @@ export default function ParkingMapPage() {
   const rows = [...new Set(zoneSlots.map(s => s.rowNumber))].sort((a, b) => a - b);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr 220px', gap: 12, height: 'calc(100vh - 80px)' }}>
+    <div>
+      {apiErr && <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 12, color: '#ef4444' }}>⚠ {apiErr}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '170px 1fr 220px', gap: 12, height: mobile ? 'auto' : 'calc(100vh - 80px)' }}>
 
       {/* ── Left: zone selector + filter ── */}
       <div>
@@ -397,6 +412,7 @@ export default function ParkingMapPage() {
             Nhấn vào slot trống để xem thông tin
           </div>
         )}
+      </div>
       </div>
     </div>
   );

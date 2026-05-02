@@ -46,7 +46,7 @@ export default function AdminPage() {
         adminApi.getUsers(), adminApi.getPricing(), adminApi.getLogs({ limit: 50 }),
       ]);
       setUsers(u.data); setPricing(p.data); setLog(l.data);
-    } catch {}
+    } catch { toast('Không tải được dữ liệu', 'error'); }
   }, []);
 
   useEffect(() => { load(); }, [load]);

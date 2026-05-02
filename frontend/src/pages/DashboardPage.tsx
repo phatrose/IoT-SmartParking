@@ -17,16 +17,29 @@ const ALERT_STYLE: Record<string, { bg: string; border: string; dot: string }> =
 
 const ZONE_COLOR = (pct: number) => pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#3b82f6';
 
+function useIsMobile(bp = 640) {
+  const [m, setM] = useState(() => window.innerWidth < bp);
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < bp);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, [bp]);
+  return m;
+}
+
 export default function DashboardPage() {
+  const mobile = useIsMobile();
   const [data, setData] = useState<any>(null);
   const [lastUpdate, setLastUpdate] = useState('');
+  const [apiErr, setApiErr] = useState('');
 
   const load = useCallback(async () => {
     try {
       const { data: d } = await adminApi.dashboard();
       setData(d);
       setLastUpdate(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    } catch {}
+      setApiErr('');
+    } catch { setApiErr('Không thể tải dữ liệu dashboard'); }
   }, []);
 
   useEffect(() => {
@@ -37,6 +50,7 @@ export default function DashboardPage() {
 
   if (!data) return (
     <div>
+      {apiErr && <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 12, color: '#ef4444' }}>⚠ {apiErr}</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <Skeleton width={120} height={24} />
         <div style={{ display: 'flex', gap: 10 }}>
@@ -44,10 +58,10 @@ export default function DashboardPage() {
           <Skeleton width={34} height={34} />
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
         {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 280px', gap: 14 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '18px 20px' }}>
             <Skeleton width="40%" height={14} style={{ marginBottom: 8 }} />
@@ -88,6 +102,7 @@ export default function DashboardPage() {
 
   return (
     <div>
+      {apiErr && <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 12, color: '#ef4444' }}>⚠ {apiErr}</div>}
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
@@ -104,7 +119,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
         {/* Total occupied */}
         <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '18px 20px' }}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Xe đang đỗ</div>
@@ -138,7 +153,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Main content row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 280px', gap: 14 }}>
         {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Weekly chart */}

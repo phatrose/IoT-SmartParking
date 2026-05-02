@@ -10,6 +10,7 @@ import PaymentAdminPage from './pages/PaymentAdminPage';
 import UserPortal      from './pages/UserPortal';
 import GateControl     from './pages/GateControl';
 import AdminPage       from './pages/AdminPage';
+import SettingsPage    from './pages/SettingsPage';
 
 function Guard({ children, roles }: { children: any; roles?: string[] }) {
   const { user, loading } = useAuth();
@@ -22,6 +23,7 @@ function Guard({ children, roles }: { children: any; roles?: string[] }) {
 function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'STUDENT' || user.role === 'STAFF') return <Navigate to="/portal" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -35,7 +37,9 @@ export default function App() {
 
           <Route element={<Guard><Layout /></Guard>}>
             <Route path="/"          element={<HomeRedirect />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={
+              <Guard roles={['ADMIN', 'OPERATOR']}><DashboardPage /></Guard>
+            } />
             <Route path="/map"       element={<ParkingMapPage />} />
 
             {/* Báo cáo – Admin only */}
@@ -63,13 +67,8 @@ export default function App() {
               <Guard roles={['ADMIN', 'OPERATOR']}><AdminPage /></Guard>
             } />
 
-            {/* Settings placeholder */}
             <Route path="/settings" element={
-              <Guard roles={['ADMIN']}>
-                <div style={{ padding: 20, color: '#64748b', fontSize: 14 }}>
-                  ⚙️ Cài đặt hệ thống — sắp ra mắt
-                </div>
-              </Guard>
+              <Guard roles={['ADMIN']}><SettingsPage /></Guard>
             } />
           </Route>
 

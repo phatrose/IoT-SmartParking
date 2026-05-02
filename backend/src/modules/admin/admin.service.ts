@@ -78,7 +78,8 @@ export class AdminService {
         hcmutId: data.hcmutId, fullName: data.fullName, email: data.email,
         phone: data.phone, role: data.role as any, passwordHash: hash,
         licensePlate: data.licensePlate, department: data.department,
-        feeTier: data.role, isActive: true, rfidCard: '',
+        feeTier: (data.role === 'STUDENT' || data.role === 'STAFF') ? 'STANDARD' : 'EXEMPT',
+        isActive: true, rfidCard: `RFID-NEW-${Date.now()}`,
       },
     });
     await this.prisma.systemLog.create({

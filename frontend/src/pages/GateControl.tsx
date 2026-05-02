@@ -7,7 +7,18 @@ const FEES: Record<string, number> = { motorbike: 5000, car: 15000, bicycle: 200
 const VEHICLE_LABELS: Record<string, string> = { motorbike: 'Xe máy', car: 'Ô tô', bicycle: 'Xe đạp' };
 const HOURS_LABEL = [1,2,3,4,6,8,12,24].map(h => ({ value: h, label: `${h} giờ` }));
 
+function useIsMobile(bp = 640) {
+  const [m, setM] = useState(() => window.innerWidth < bp);
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < bp);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, [bp]);
+  return m;
+}
+
 export default function GateControl() {
+  const mobile = useIsMobile();
   const { toast } = useToast();
   const [plate,  setPlate]  = useState('');
   const [type,   setType]   = useState('motorbike');
@@ -20,7 +31,7 @@ export default function GateControl() {
   const printRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
-    try { const { data } = await visitorApi.list(true); setTickets(data); } catch {}
+    try { const { data } = await visitorApi.list(true); setTickets(data); } catch { toast('Không tải được danh sách vé', 'error'); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -107,7 +118,7 @@ export default function GateControl() {
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Vé tạm thời</h1>
       <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Cấp vé cho xe khách vãng lai</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 380px', gap: 16 }}>
         {/* Left: form */}
         <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '20px 22px' }}>
           <form onSubmit={issue}>
