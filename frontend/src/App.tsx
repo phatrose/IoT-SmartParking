@@ -1,29 +1,34 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ToastProvider } from './components/Toast';
-import LoginPage       from './pages/LoginPage';
-import Layout          from './components/Layout';
-import DashboardPage   from './pages/DashboardPage';
-import ParkingMapPage  from './pages/ParkingMapPage';
-import ReportsPage     from './pages/ReportsPage';
-import PaymentAdminPage from './pages/PaymentAdminPage';
-import UserPortal      from './pages/UserPortal';
-import GateControl     from './pages/GateControl';
-import AdminPage       from './pages/AdminPage';
-import SettingsPage    from './pages/SettingsPage';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ToastProvider } from "./components/Toast";
+import CasLoginPage from "./pages/CasLoginPage";
+import LoginPage from "./pages/LoginPage";
+import Layout from "./components/Layout";
+import DashboardPage from "./pages/DashboardPage";
+import ParkingMapPage from "./pages/ParkingMapPage";
+import ReportsPage from "./pages/ReportsPage";
+import PaymentAdminPage from "./pages/PaymentAdminPage";
+import UserPortal from "./pages/UserPortal";
+import GateControl from "./pages/GateControl";
+import AdminPage from "./pages/AdminPage";
+import SettingsPage from "./pages/SettingsPage";
+
 
 function Guard({ children, roles }: { children: any; roles?: string[] }) {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{ padding: 40, color: '#64748b' }}>Đang tải...</div>;
-  if (!user)   return <Navigate to="/login" replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+  if (loading)
+    return <div style={{ padding: 40, color: "#64748b" }}>Đang tải...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (roles && !roles.includes(user.role))
+    return <Navigate to="/dashboard" replace />;
   return children;
 }
 
 function HomeRedirect() {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'STUDENT' || user.role === 'STAFF') return <Navigate to="/portal" replace />;
+  if (!user) return <Navigate to="/cas" replace />;
+  if (user.role === "STUDENT" || user.role === "STAFF")
+    return <Navigate to="/portal" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -32,48 +37,90 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Routes>
+            <Route path="/cas" element={<CasLoginPage />} />
+            <Route path="/login" element={<LoginPage />} />
 
-          <Route element={<Guard><Layout /></Guard>}>
-            <Route path="/"          element={<HomeRedirect />} />
-            <Route path="/dashboard" element={
-              <Guard roles={['ADMIN', 'OPERATOR']}><DashboardPage /></Guard>
-            } />
-            <Route path="/map"       element={<ParkingMapPage />} />
+            <Route
+              element={
+                <Guard>
+                  <Layout />
+                </Guard>
+              }
+            >
+              <Route path="/" element={<HomeRedirect />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <Guard roles={["ADMIN", "OPERATOR"]}>
+                    <DashboardPage />
+                  </Guard>
+                }
+              />
+              <Route path="/map" element={<ParkingMapPage />} />
 
-            {/* Báo cáo – Admin only */}
-            <Route path="/reports" element={
-              <Guard roles={['ADMIN']}><ReportsPage /></Guard>
-            } />
+              {/* Báo cáo – Admin only */}
+              <Route
+                path="/reports"
+                element={
+                  <Guard roles={["ADMIN"]}>
+                    <ReportsPage />
+                  </Guard>
+                }
+              />
 
-            {/* Thanh toán admin – Admin/Operator */}
-            <Route path="/payments" element={
-              <Guard roles={['ADMIN', 'OPERATOR']}><PaymentAdminPage /></Guard>
-            } />
+              {/* Thanh toán admin – Admin/Operator */}
+              <Route
+                path="/payments"
+                element={
+                  <Guard roles={["ADMIN", "OPERATOR"]}>
+                    <PaymentAdminPage />
+                  </Guard>
+                }
+              />
 
-            {/* Thanh toán cá nhân – Student/Staff */}
-            <Route path="/portal" element={
-              <Guard roles={['STUDENT', 'STAFF']}><UserPortal /></Guard>
-            } />
+              {/* Thanh toán cá nhân – Student/Staff */}
+              <Route
+                path="/portal"
+                element={
+                  <Guard roles={["STUDENT", "STAFF"]}>
+                    <UserPortal />
+                  </Guard>
+                }
+              />
 
-            {/* Vé tạm thời – Operator/Admin */}
-            <Route path="/gate" element={
-              <Guard roles={['ADMIN', 'OPERATOR']}><GateControl /></Guard>
-            } />
+              {/* Vé tạm thời – Operator/Admin */}
+              <Route
+                path="/gate"
+                element={
+                  <Guard roles={["ADMIN", "OPERATOR"]}>
+                    <GateControl />
+                  </Guard>
+                }
+              />
 
-            {/* Người dùng + cài đặt – Admin/Operator */}
-            <Route path="/admin" element={
-              <Guard roles={['ADMIN', 'OPERATOR']}><AdminPage /></Guard>
-            } />
+              {/* Người dùng + cài đặt – Admin/Operator */}
+              <Route
+                path="/admin"
+                element={
+                  <Guard roles={["ADMIN", "OPERATOR"]}>
+                    <AdminPage />
+                  </Guard>
+                }
+              />
 
-            <Route path="/settings" element={
-              <Guard roles={['ADMIN']}><SettingsPage /></Guard>
-            } />
-          </Route>
+              <Route
+                path="/settings"
+                element={
+                  <Guard roles={["ADMIN"]}>
+                    <SettingsPage />
+                  </Guard>
+                }
+              />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
