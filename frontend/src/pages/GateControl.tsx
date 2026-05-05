@@ -28,6 +28,7 @@ export default function GateControl() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [issuedTicket, setIssuedTicket] = useState<any>(null);
+  const [showReviewPopup, setShowReviewPopup] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -35,6 +36,13 @@ export default function GateControl() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (showReviewPopup && issuedTicket) {
+      const timeout = setTimeout(() => setShowReviewPopup(false), 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [showReviewPopup, issuedTicket]);
 
   const fee = FEES[type] * hours;
 
@@ -50,6 +58,7 @@ export default function GateControl() {
         duration_hours: hours,
       });
       setIssuedTicket({ ...data, plate: plate.toUpperCase(), name, msv, type, hours, fee: data.fee_preview ?? fee });
+      setShowReviewPopup(true);
       setPlate(''); setName(''); setMsv('');
       toast('Cấp vé thành công!', 'success');
       await load();
@@ -251,7 +260,7 @@ export default function GateControl() {
             </div>
           </div>
 
-          {/* Active tickets */}
+        {/* Active tickets */}
           {tickets.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -293,6 +302,103 @@ export default function GateControl() {
           )}
         </div>
       </div>
+
+      {showReviewPopup && issuedTicket && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowReviewPopup(false)}
+        >
+          <div 
+            style={{
+              background: '#1c2333',
+              border: '1px solid #2a3650',
+              borderRadius: 16,
+              padding: 28,
+              width: 'min(420px, 90vw)',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>✅ Vé đã cấp thành công</h2>
+              <button 
+                onClick={() => setShowReviewPopup(false)}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 20, cursor: 'pointer', padding: 4 }}
+              >✕</button>
+            </div>
+
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: 1, marginBottom: 8 }}>VÉ GỬI XE TẠM THỜI</div>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>Bãi xe Đại học HCMUT</div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+              <div style={{ background: '#fff', padding: 12, borderRadius: 10 }}>
+                <QRCodeSVG value={qrValue} size={100} level="M" />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'monospace', color: '#3b82f6', marginBottom: 4 }}>
+                  {issuedTicket.ticket_code}
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>Mã vé</div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 6 }}>Biển số xe</div>
+                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace' }}>{issuedTicket.plate}</div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 6 }}>Người gửi</div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{issuedTicket.name || issuedTicket.msv || 'Khách vãng lai'}</div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>Loại xe</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{VEHICLE_LABELS[issuedTicket.type] || issuedTicket.type}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>Thời gian</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{issuedTicket.hours} giờ</div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#3b82f6', marginBottom: 4 }}>
+                  {Number(issuedTicket.fee).toLocaleString('vi-VN')}đ
+                </div>
+                <div style={{ fontSize: 12, color: '#94a3b8' }}>Phí gửi xe</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+              <button onClick={printTicket} style={{ flex: 1, padding: '12px', borderRadius: 10, background: '#22c55e', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                🖨 In vé
+              </button>
+              <button onClick={() => setShowReviewPopup(false)} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'transparent', color: '#94a3b8', border: '1px solid #2a3650', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Đóng
+              </button>
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: '#64748b', paddingTop: 12, borderTop: '1px solid #2a3650' }}>
+              Vui lòng giữ vé để xuất trình khi ra cổng
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
