@@ -48,4 +48,10 @@ export class IoTController {
   markFault(@Param('id') id: string) {
     return this.iotService.markSensorFault(id);
   }
+
+  @Roles('OPERATOR', 'ADMIN')
+  @Post('sensor/:id/clear')
+  clearFault(@Param('id') id: string) {
+    return this.iotService.clearFault(id);
+  }
 }

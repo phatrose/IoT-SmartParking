@@ -52,6 +52,13 @@ export const parkingApi = {
     api.post("/api/parking/checkout", { rfid_card: rfid, gate_id: gateId }),
   myHistory: () => api.get("/api/parking/me/history"),
   myActiveSession: () => api.get("/api/parking/me/active"),
+  reserve: (slotId: number) => api.post("/api/parking/reserve", { slot_id: slotId }),
+  cancelReserve: () => api.delete("/api/parking/reserve"),
+  getReservations: () => api.get("/api/parking/reservations"),
+  getActiveSessions: () => api.get("/api/parking/active-sessions"),
+  requestCheckout: () => api.post("/api/parking/checkout-request"),
+  cancelCheckoutRequest: () => api.delete("/api/parking/checkout-request"),
+  getCheckoutRequest: () => api.get("/api/parking/checkout-request"),
 };
 
 export const visitorApi = {
@@ -68,6 +75,8 @@ export const iotApi = {
   getLed: (zone: string) => api.get(`/api/iot/led/${zone}`),
   markFault: (sensorId: string) =>
     api.post(`/api/iot/sensor/${sensorId}/fault`),
+  clearFault: (sensorId: string) =>
+    api.post(`/api/iot/sensor/${sensorId}/clear`),
   sensorEvent: (data: any) =>
     api.post("/api/iot/sensor", data, {
       headers: { "x-iot-key": "iot_spms_dev_key" },

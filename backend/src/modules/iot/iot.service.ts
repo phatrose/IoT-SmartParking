@@ -9,7 +9,7 @@
  *   - Nếu timestamp quá cũ (> 5s)      → tự động flag faulty
  *   - Slot faulty không tham gia LED count
  */
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../config/prisma.service';
 
@@ -129,6 +129,31 @@ export class IoTService {
 
   async markSensorFault(sensorId: string) {
     return this.processSensorEvent({ sensorId, status: 'occupied', isFaulty: true });
+  }
+
+  async clearFault(sensorId: string) {
+    const slot = await this.prisma.parkingSlot.findUnique({
+      where: { sensorId },
+      include: { zone: true },
+    });
+    if (!slot) return { success: false, message: `Sensor ${sensorId} không tồn tại` };
+
+    await this.prisma.parkingSlot.update({
+      where: { id: slot.id },
+      data: { isFaulty: false, status: 'AVAILABLE', lastIotUpdate: new Date() },
+    });
+
+    await this.prisma.systemLog.create({
+      data: {
+        eventType:   'fault',
+        userName:    sensorId,
+        description: `Khôi phục cảm biến ${slot.slotCode}`,
+        status:      'OK',
+      },
+    });
+
+    const led = await this.computeLedState(slot.zone.zoneCode);
+    return { success: true, slotCode: slot.slotCode, zone: slot.zone.zoneCode, led_state: led.state };
   }
 
   /**

@@ -1,7 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { visitorApi } from '../services/api';
+import { visitorApi, parkingApi } from '../services/api';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../contexts/AuthContext';
+
+interface Reservation {
+  userId: number;
+  user: { name: string; hcmutId: string; rfidCard: string };
+  slot: { slotCode: string; zone: string };
+  checkedIn: boolean;
+  sessionId: number | null;
+}
+
+interface ActiveSession {
+  id: number;
+  entryTime: string;
+  entryGate: string;
+  user: { id: number; fullName: string; hcmutId: string; rfidCard: string };
+  slot: { slotCode: string; zone: { zoneCode: string } } | null;
+}
 
 const FEES: Record<string, number> = { motorbike: 5000, car: 15000, bicycle: 2000 };
 const VEHICLE_LABELS: Record<string, string> = { motorbike: 'Xe máy', car: 'Ô tô', bicycle: 'Xe đạp' };
@@ -20,6 +37,8 @@ function useIsMobile(bp = 640) {
 export default function GateControl() {
   const mobile = useIsMobile();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isOperator = user?.role === 'OPERATOR' || user?.role === 'ADMIN';
   const [plate,  setPlate]  = useState('');
   const [type,   setType]   = useState('motorbike');
   const [name,   setName]   = useState('');
@@ -30,6 +49,67 @@ export default function GateControl() {
   const [issuedTicket, setIssuedTicket] = useState<any>(null);
   const [showReviewPopup, setShowReviewPopup] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Gate dashboard state
+  const [reservations, setReservations]     = useState<Reservation[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [resLastUpdate, setResLastUpdate]   = useState('');
+  const [checkingIn, setCheckingIn]         = useState<number | null>(null);
+  const [checkingOut, setCheckingOut]       = useState<number | null>(null);
+  const resTimerRef = useRef<any>();
+
+  // RFID simulation state
+  const [rfid, setRfid]         = useState('');
+  const [rfidGate, setRfidGate] = useState('GATE-A');
+  const [rfidResult, setRfidResult] = useState<{
+    granted: boolean; msg: string; slotCode?: string; wasReserved?: boolean; userName?: string;
+  } | null>(null);
+  const [rfidBusy, setRfidBusy] = useState(false);
+
+  const loadGateData = useCallback(async () => {
+    if (!isOperator) return;
+    try {
+      const [resRes, sesRes] = await Promise.all([
+        parkingApi.getReservations(),
+        parkingApi.getActiveSessions(),
+      ]);
+      setReservations(resRes.data);
+      setActiveSessions(sesRes.data);
+      setResLastUpdate(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch {}
+  }, [isOperator]);
+
+  useEffect(() => {
+    loadGateData();
+    resTimerRef.current = setInterval(loadGateData, 5000);
+    return () => clearInterval(resTimerRef.current);
+  }, [loadGateData]);
+
+  const quickCheckin = async (r: Reservation) => {
+    setCheckingIn(r.userId);
+    try {
+      const { data } = await parkingApi.checkIn(r.user.rfidCard, rfidGate);
+      if (data.granted) {
+        toast(`✅ ${r.user.name} vào bãi — Slot ${data.slot_code ?? r.slot.slotCode}`, 'success');
+        loadGateData();
+      } else {
+        toast(data.reason || 'Từ chối', 'error');
+      }
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Lỗi kết nối', 'error');
+    } finally { setCheckingIn(null); }
+  };
+
+  const quickCheckout = async (s: ActiveSession) => {
+    setCheckingOut(s.id);
+    try {
+      const { data } = await parkingApi.checkOut(s.user.rfidCard, rfidGate);
+      toast(`✅ ${s.user.fullName} ra bãi — ${data.duration_minutes ?? 0} phút`, 'success');
+      loadGateData();
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Lỗi kết nối', 'error');
+    } finally { setCheckingOut(null); }
+  };
 
   const load = useCallback(async () => {
     try { const { data } = await visitorApi.list(true); setTickets(data); } catch { toast('Không tải được danh sách vé', 'error'); }
@@ -122,10 +202,200 @@ export default function GateControl() {
     ? `SPMS:${issuedTicket.ticket_code}|${issuedTicket.plate}|${issuedTicket.hours}h`
     : '';
 
+  const rfidScan = async (action: 'checkin' | 'checkout') => {
+    if (!rfid.trim()) { toast('Nhập mã thẻ RFID trước', 'error'); return; }
+    setRfidBusy(true); setRfidResult(null);
+    try {
+      const { data } = action === 'checkin'
+        ? await parkingApi.checkIn(rfid.trim(), rfidGate)
+        : await parkingApi.checkOut(rfid.trim(), rfidGate);
+      if (action === 'checkin') {
+        setRfidResult({
+          granted: data.granted !== false,
+          msg: data.granted ? (data.message || 'Vào bãi thành công') : (data.reason || 'Từ chối'),
+          slotCode: data.slot_code,
+          wasReserved: data.was_reserved,
+          userName: data.user?.name,
+        });
+      } else {
+        setRfidResult({ granted: true, msg: data.message || 'Ra bãi thành công' });
+      }
+      if (data.granted !== false) {
+        toast(action === 'checkin' ? 'Mở barrier — Xe vào' : 'Mở barrier — Xe ra', 'success');
+        loadGateData();
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Lỗi kết nối';
+      setRfidResult({ granted: false, msg });
+      toast(msg, 'error');
+    } finally { setRfidBusy(false); }
+  };
+
   return (
     <div>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Vé tạm thời</h1>
-      <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Cấp vé cho xe khách vãng lai</p>
+      <p style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>Cấp vé cho xe khách vãng lai</p>
+
+      {/* ── Gate Dashboard: 2 cột Xe chờ vào / Xe chờ ra ── */}
+      {isOperator && (
+        <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '16px 20px', marginBottom: 16 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>🚧 Bảng điều phối cổng</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: '#64748b' }}>Cổng:</span>
+                <select value={rfidGate} onChange={e => setRfidGate(e.target.value)}
+                  style={{ background: '#222b3a', border: '1px solid #2a3650', borderRadius: 6,
+                    padding: '3px 8px', color: '#e2e8f0', fontSize: 12, fontFamily: 'inherit' }}>
+                  {['GATE-A', 'GATE-B', 'GATE-C'].map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <span style={{ fontSize: 11, color: '#64748b' }}>Cập nhật: {resLastUpdate || '—'}</span>
+            </div>
+          </div>
+
+          {/* 2-column layout */}
+          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+
+            {/* ── Cột trái: Xe chờ vào ── */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>↓ Xe chờ vào</span>
+                <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 11,
+                  background: 'rgba(34,197,94,.15)', color: '#22c55e' }}>
+                  {reservations.filter(r => !r.checkedIn).length}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {reservations.filter(r => !r.checkedIn).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b', fontSize: 12,
+                    border: '1px dashed #2a3650', borderRadius: 10 }}>
+                    Không có xe đặt trước
+                  </div>
+                ) : reservations.filter(r => !r.checkedIn).map(r => (
+                  <div key={r.userId} style={{
+                    background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.2)',
+                    borderRadius: 10, padding: '10px 12px',
+                    display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{r.user.name}</div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                        {r.user.hcmutId} · Slot <span style={{ fontFamily: 'monospace', color: '#3b82f6', fontWeight: 700 }}>{r.slot.slotCode}</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: '#64748b', marginTop: 1, fontFamily: 'monospace' }}>
+                        {r.user.rfidCard}
+                      </div>
+                    </div>
+                    <button onClick={() => quickCheckin(r)} disabled={checkingIn === r.userId}
+                      style={{ padding: '7px 14px', borderRadius: 8, border: 'none',
+                        background: checkingIn === r.userId ? '#374151' : '#22c55e',
+                        color: '#fff', fontSize: 12, fontWeight: 700,
+                        cursor: checkingIn === r.userId ? 'not-allowed' : 'pointer',
+                        fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                      {checkingIn === r.userId ? '...' : '↓ Cho vào'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Cột phải: Xe chờ ra ── */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>↑ Xe chờ ra</span>
+                <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 11,
+                  background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}>
+                  {activeSessions.length}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+                {activeSessions.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b', fontSize: 12,
+                    border: '1px dashed #2a3650', borderRadius: 10 }}>
+                    Không có xe trong bãi
+                  </div>
+                ) : activeSessions.map(s => {
+                  const mins = Math.floor((Date.now() - new Date(s.entryTime).getTime()) / 60000);
+                  const h = Math.floor(mins / 60), m = mins % 60;
+                  return (
+                    <div key={s.id} style={{
+                      background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)',
+                      borderRadius: 10, padding: '10px 12px',
+                      display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center',
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{s.user.fullName}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                          {s.user.hcmutId} · Slot <span style={{ fontFamily: 'monospace', color: '#f59e0b', fontWeight: 700 }}>{s.slot?.slotCode ?? '—'}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
+                          Vào {new Date(s.entryTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} · {h > 0 ? `${h}h ` : ''}{m}p
+                        </div>
+                      </div>
+                      <button onClick={() => quickCheckout(s)} disabled={checkingOut === s.id}
+                        style={{ padding: '7px 14px', borderRadius: 8, border: 'none',
+                          background: checkingOut === s.id ? '#374151' : '#f59e0b',
+                          color: '#fff', fontSize: 12, fontWeight: 700,
+                          cursor: checkingOut === s.id ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                        {checkingOut === s.id ? '...' : '↑ Cho ra'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── RFID Simulation panel ── */}
+      <div style={{ background: '#1c2333', border: '1px solid #2a3650', borderRadius: 12, padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>📡</span> Giả lập quét thẻ RFID
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 5 }}>Mã thẻ RFID</label>
+            <input value={rfid} onChange={e => setRfid(e.target.value)}
+              placeholder="VD: RFID-SV001 hoặc mã thẻ thật"
+              style={{ ...inputStyle, background: '#0f1117' }} />
+          </div>
+          <div style={{ flex: '0 0 120px' }}>
+            <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 5 }}>Cổng</label>
+            <select value={rfidGate} onChange={e => setRfidGate(e.target.value)} style={{ ...inputStyle, background: '#0f1117' }}>
+              {['GATE-A', 'GATE-B', 'GATE-C'].map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+          <button type="button" onClick={() => rfidScan('checkin')} disabled={rfidBusy}
+            style={{ flex: '0 0 auto', padding: '10px 18px', borderRadius: 8, background: rfidBusy ? '#374151' : '#22c55e',
+              border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: rfidBusy ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+            ↓ Vào bãi
+          </button>
+          <button type="button" onClick={() => rfidScan('checkout')} disabled={rfidBusy}
+            style={{ flex: '0 0 auto', padding: '10px 18px', borderRadius: 8, background: rfidBusy ? '#374151' : '#f59e0b',
+              border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: rfidBusy ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+            ↑ Ra bãi
+          </button>
+        </div>
+        {rfidResult && (
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, fontSize: 13,
+            background: rfidResult.granted ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)',
+            border: `1px solid ${rfidResult.granted ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.3)'}`,
+            color: rfidResult.granted ? '#22c55e' : '#ef4444' }}>
+            {rfidResult.granted ? '✅' : '❌'} {rfidResult.msg}
+            {rfidResult.slotCode && (
+              <div style={{ marginTop: 4, fontSize: 12, color: rfidResult.wasReserved ? '#22c55e' : '#94a3b8' }}>
+                Slot: <strong style={{ fontFamily: 'monospace' }}>{rfidResult.slotCode}</strong>
+                {rfidResult.wasReserved && ' (đặt trước)'}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 380px', gap: 16 }}>
         {/* Left: form */}

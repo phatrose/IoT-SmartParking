@@ -20,15 +20,31 @@ export class ParkingService {
   private readonly logger = new Logger(ParkingService.name);
   private readonly SLA_MS = 2000;
 
+  // In-memory reservation map: userId → slotId
+  private readonly reservations = new Map<number, number>();
+  // In-memory checkout request set: userId
+  private readonly checkoutRequests = new Set<number>();
+
   constructor(private readonly prisma: PrismaService) {}
+
+  async reserve(userId: number, slotId: number) {
+    this.reservations.set(userId, slotId);
+    const slot = await this.prisma.parkingSlot.findUnique({
+      where: { id: slotId },
+      select: { slotCode: true, zone: { select: { zoneCode: true } } },
+    });
+    return { success: true, slot_code: slot?.slotCode, zone: slot?.zone?.zoneCode };
+  }
+
+  async cancelReserve(userId: number) {
+    this.reservations.delete(userId);
+    return { success: true };
+  }
 
   async checkIn(params: { rfidCard: string; gateId: string; slotId?: number; ipAddress?: string }) {
     const t0 = Date.now();
 
-    // Step 1: Tìm user theo RFID (indexed → nhanh)
-    const user = await this.prisma.user.findUnique({
-      where: { rfidCard: params.rfidCard },
-    });
+    const user = await this.prisma.user.findUnique({ where: { rfidCard: params.rfidCard } });
 
     if (!user) {
       await this.prisma.systemLog.create({
@@ -46,7 +62,6 @@ export class ParkingService {
       return { granted: false, reason: 'Tài khoản đã bị khóa' };
     }
 
-    // Step 2: Kiểm tra chưa có active session
     const active = await this.prisma.parkingSession.findFirst({
       where: { userId: user.id, status: 'ACTIVE' },
     });
@@ -54,39 +69,55 @@ export class ParkingService {
       return { granted: false, reason: 'Xe đã ở trong bãi (anti-double-entry)' };
     }
 
-    // Step 3: Tạo session
+    // Ưu tiên: slot từ param → slot đặt trước
+    const reservedSlotId = this.reservations.get(user.id) ?? null;
+    const effectiveSlotId = params.slotId ?? reservedSlotId;
+    const wasReserved = !!reservedSlotId && !params.slotId;
+    if (reservedSlotId) this.reservations.delete(user.id);
+
+    // Lấy thông tin slot
+    let slotCode: string | null = null;
+    if (effectiveSlotId) {
+      const slot = await this.prisma.parkingSlot.findUnique({
+        where: { id: effectiveSlotId },
+        select: { slotCode: true },
+      });
+      slotCode = slot?.slotCode ?? null;
+    }
+
     const billingPeriod = user.role === 'STUDENT' ? dayjs().format('YYYY-MM') : null;
     const session = await this.prisma.parkingSession.create({
       data: {
         userId:        user.id,
-        slotId:        params.slotId ?? null,
+        slotId:        effectiveSlotId,
         entryGate:     params.gateId,
         billingPeriod,
       },
     });
 
-    // Step 4: Audit log
     await this.prisma.systemLog.create({
       data: {
         eventType:   'entry',
         userId:      user.id,
         userName:    user.fullName,
-        description: `Vào bãi – Cổng ${params.gateId}`,
-        metadata:    JSON.stringify({ rfid: params.rfidCard, sessionId: session.id }),
+        description: `Vào bãi – Cổng ${params.gateId}${slotCode ? ` – Slot ${slotCode}` : ''}${wasReserved ? ' (đặt trước)' : ''}`,
+        metadata:    JSON.stringify({ rfid: params.rfidCard, sessionId: session.id, slotCode }),
         ipAddress:   params.ipAddress,
       },
     });
 
     const elapsed = Date.now() - t0;
     if (elapsed > this.SLA_MS) {
-      this.logger.warn(`⚠️  CheckIn SLA breach: ${elapsed}ms (limit ${this.SLA_MS}ms)`);
+      this.logger.warn(`⚠️  CheckIn SLA breach: ${elapsed}ms`);
     }
 
     return {
-      granted:     true,
-      session_id:  session.id,
-      user: { name: user.fullName, role: user.role, hcmut_id: user.hcmutId },
-      message:     '✅ Mở cổng – Hoan nghênh!',
+      granted:      true,
+      session_id:   session.id,
+      user:         { name: user.fullName, role: user.role, hcmut_id: user.hcmutId },
+      slot_code:    slotCode,
+      was_reserved: wasReserved,
+      message:      `Hoan nghênh ${user.fullName}!${slotCode ? ` Slot: ${slotCode}${wasReserved ? ' (đặt trước)' : ''}` : ''}`,
       processingMs: elapsed,
     };
   }
@@ -100,6 +131,7 @@ export class ParkingService {
     const session = await this.prisma.parkingSession.findFirst({
       where: { userId: user.id, status: 'ACTIVE' },
     });
+    this.checkoutRequests.delete(user.id);
     if (!session) throw new BadRequestException('Không có phiên gửi xe đang hoạt động');
 
     // Tính duration
@@ -158,5 +190,62 @@ export class ParkingService {
       orderBy: { entryTime: 'desc' },
       take: limit,
     });
+  }
+
+  async requestCheckout(userId: number) {
+    const session = await this.prisma.parkingSession.findFirst({
+      where: { userId, status: 'ACTIVE' },
+      include: { slot: { select: { slotCode: true } } },
+    });
+    if (!session) return { success: false, reason: 'Không có phiên gửi xe đang hoạt động' };
+    this.checkoutRequests.add(userId);
+    return { success: true, session_id: session.id, slot_code: session.slot?.slotCode };
+  }
+
+  async cancelCheckoutRequest(userId: number) {
+    this.checkoutRequests.delete(userId);
+    return { success: true };
+  }
+
+  hasCheckoutRequest(userId: number) {
+    return this.checkoutRequests.has(userId);
+  }
+
+  async getActiveSessions() {
+    if (this.checkoutRequests.size === 0) return [];
+    const userIds = [...this.checkoutRequests];
+    return this.prisma.parkingSession.findMany({
+      where: { status: 'ACTIVE', userId: { in: userIds } },
+      include: {
+        user: { select: { id: true, fullName: true, hcmutId: true, rfidCard: true } },
+        slot: { select: { slotCode: true, zone: { select: { zoneCode: true } } } },
+      },
+      orderBy: { entryTime: 'asc' },
+    });
+  }
+
+  async getReservations() {
+    const result = [];
+    for (const [userId, slotId] of this.reservations.entries()) {
+      const [user, slot, activeSession] = await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, fullName: true, hcmutId: true, rfidCard: true },
+        }),
+        this.prisma.parkingSlot.findUnique({
+          where: { id: slotId },
+          select: { slotCode: true, zone: { select: { zoneCode: true } } },
+        }),
+        this.prisma.parkingSession.findFirst({ where: { userId, status: 'ACTIVE' } }),
+      ]);
+      result.push({
+        userId,
+        user: { name: user?.fullName, hcmutId: user?.hcmutId, rfidCard: user?.rfidCard },
+        slot: { slotCode: slot?.slotCode, zone: slot?.zone?.zoneCode },
+        checkedIn: !!activeSession,
+        sessionId: activeSession?.id ?? null,
+      });
+    }
+    return result;
   }
 }
