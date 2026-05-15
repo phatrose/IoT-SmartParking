@@ -196,8 +196,8 @@ export default function GateControl() {
   const nowStr  = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-  const previewPlate = plate.toUpperCase() || '---';
-  const previewName  = name || msv || '---';
+  const previewPlate = issuedTicket?.plate || plate.toUpperCase() || '---';
+  const previewName  = issuedTicket ? (issuedTicket.name || issuedTicket.msv || 'Khách vãng lai') : (name || msv || '---');
   const qrValue = issuedTicket
     ? `SPMS:${issuedTicket.ticket_code}|${issuedTicket.plate}|${issuedTicket.hours}h`
     : '';

@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "db:setup": "npm run prisma:push && npm run prisma:seed"
+    "db:setup": "npm run prisma:push && npm run prisma:seed",
+    "test": "ts-node src/modules/billing/billing-calculator.spec.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",

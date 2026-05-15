@@ -160,115 +160,101 @@ async function main() {
   }
   console.log("[Seed] ✓ Parking zones (3) + slots (148)");
 
-  // ─── 4. Sample Payments ───
-  const user1Id = userIdByHcmutId.get("2211001");
-  const user2Id = userIdByHcmutId.get("2211002");
-  const user3Id = userIdByHcmutId.get("2211003");
-  if (!user1Id || !user2Id || !user3Id) {
-    throw new Error("[Seed] Missing user IDs for sample payments");
-  }
+  // Lấy slot IDs để gán cho sessions
+  const slotsA = await prisma.parkingSlot.findMany({ where: { zone: { zoneCode: "A" } }, orderBy: { slotCode: "asc" } });
+  const slotsB = await prisma.parkingSlot.findMany({ where: { zone: { zoneCode: "B" } }, orderBy: { slotCode: "asc" } });
 
+  const user1Id = userIdByHcmutId.get("2211001")!;
+  const user2Id = userIdByHcmutId.get("2211002")!;
+  const user3Id = userIdByHcmutId.get("2211003")!;
+
+  const d = (daysAgo: number, h = 8, m = 0) => {
+    const t = new Date("2026-05-15T00:00:00+07:00");
+    t.setDate(t.getDate() - daysAgo);
+    t.setHours(h, m, 0, 0);
+    return t;
+  };
+
+  // ─── 4. Parking Sessions (lịch sử 15 ngày + 2 ACTIVE hôm nay) ───
+  await prisma.parkingSession.createMany({
+    data: [
+      // Hôm nay – ACTIVE (2 xe đang trong bãi)
+      { userId: user1Id, slotId: slotsA[0].id, entryGate: "GATE-A", entryTime: d(0, 7, 30), status: "ACTIVE",  billingPeriod: "2026-05" },
+      { userId: user2Id, slotId: slotsA[1].id, entryGate: "GATE-A", entryTime: d(0, 8, 15), status: "ACTIVE",  billingPeriod: "2026-05" },
+      // Hôm nay – đã ra
+      { userId: user3Id, slotId: slotsB[0].id, entryGate: "GATE-B", entryTime: d(0, 6, 0),  exitTime: d(0, 11, 45), exitGate: "GATE-B", durationMinutes: 345, status: "CLOSED", billingPeriod: "2026-05" },
+      // Hôm qua
+      { userId: user1Id, slotId: slotsA[2].id, entryGate: "GATE-A", entryTime: d(1, 7, 0),  exitTime: d(1, 17, 30), exitGate: "GATE-A", durationMinutes: 630, status: "CLOSED", billingPeriod: "2026-05" },
+      { userId: user2Id, slotId: slotsA[3].id, entryGate: "GATE-A", entryTime: d(1, 8, 0),  exitTime: d(1, 16, 0),  exitGate: "GATE-A", durationMinutes: 480, status: "CLOSED", billingPeriod: "2026-05" },
+      { userId: user3Id, slotId: slotsB[1].id, entryGate: "GATE-B", entryTime: d(1, 9, 0),  exitTime: d(1, 12, 30), exitGate: "GATE-B", durationMinutes: 210, status: "CLOSED", billingPeriod: "2026-05" },
+      // 3 ngày trước
+      { userId: user1Id, slotId: slotsA[0].id, entryGate: "GATE-A", entryTime: d(3, 7, 45), exitTime: d(3, 18, 0),  exitGate: "GATE-A", durationMinutes: 615, status: "CLOSED", billingPeriod: "2026-05" },
+      { userId: user3Id, slotId: slotsB[2].id, entryGate: "GATE-B", entryTime: d(3, 8, 30), exitTime: d(3, 11, 0),  exitGate: "GATE-B", durationMinutes: 150, status: "CLOSED", billingPeriod: "2026-05" },
+      // 1 tuần trước
+      { userId: user1Id, slotId: slotsA[1].id, entryGate: "GATE-A", entryTime: d(7, 7, 0),  exitTime: d(7, 17, 0),  exitGate: "GATE-A", durationMinutes: 600, status: "CLOSED", billingPeriod: "2026-05" },
+      { userId: user2Id, slotId: slotsA[4].id, entryGate: "GATE-A", entryTime: d(7, 8, 0),  exitTime: d(7, 15, 30), exitGate: "GATE-A", durationMinutes: 450, status: "CLOSED", billingPeriod: "2026-05" },
+      { userId: user3Id, slotId: slotsB[3].id, entryGate: "GATE-B", entryTime: d(7, 9, 0),  exitTime: d(7, 13, 0),  exitGate: "GATE-B", durationMinutes: 240, status: "CLOSED", billingPeriod: "2026-05" },
+      // Tháng trước (2026-04)
+      { userId: user1Id, slotId: slotsA[0].id, entryGate: "GATE-A", entryTime: d(20, 7, 0), exitTime: d(20, 17, 0), exitGate: "GATE-A", durationMinutes: 600, status: "CLOSED", billingPeriod: "2026-04" },
+      { userId: user2Id, slotId: slotsA[1].id, entryGate: "GATE-A", entryTime: d(22, 8, 0), exitTime: d(22, 16, 0), exitGate: "GATE-A", durationMinutes: 480, status: "CLOSED", billingPeriod: "2026-04" },
+      { userId: user1Id, slotId: slotsA[2].id, entryGate: "GATE-A", entryTime: d(25, 7, 0), exitTime: d(25, 18, 0), exitGate: "GATE-A", durationMinutes: 660, status: "CLOSED", billingPeriod: "2026-04" },
+    ],
+  });
+  console.log("[Seed] ✓ Parking sessions (14)");
+
+  // ─── 5. Visitor Tickets ───
+  const opId = userIdByHcmutId.get("OP-001")!;
+  await prisma.visitorTicket.createMany({
+    data: [
+      { ticketCode: "VT-000001", licensePlate: "29A-99001", vehicleType: "motorbike", visitorName: "Nguyễn Khách A", issuedById: opId, entryTime: d(0, 8, 0),  expiryTime: d(0, 10, 0), feeAmount: 10000, isActive: false, exitTime: d(0, 9, 45) },
+      { ticketCode: "VT-000002", licensePlate: "51A-11222", vehicleType: "car",       visitorName: "Trần Khách B",   issuedById: opId, entryTime: d(0, 9, 0),  expiryTime: d(0, 11, 0), feeAmount: 30000, isActive: true },
+      { ticketCode: "VT-000003", licensePlate: "30A-33333", vehicleType: "motorbike", visitorName: "Lê Khách C",    issuedById: opId, entryTime: d(1, 14, 0), expiryTime: d(1, 16, 0), feeAmount: 10000, isActive: false, exitTime: d(1, 15, 50) },
+      { ticketCode: "VT-000004", licensePlate: "29B-55555", vehicleType: "bicycle",   visitorName: "Phạm Khách D",  issuedById: opId, entryTime: d(2, 7, 30), expiryTime: d(2, 9, 30), feeAmount: 4000,  isActive: false, exitTime: d(2, 9, 10) },
+      { ticketCode: "VT-000005", licensePlate: "51B-77777", vehicleType: "car",       visitorName: "Hoàng Khách E", issuedById: opId, entryTime: d(0, 10, 0), expiryTime: d(0, 12, 0), feeAmount: 30000, isActive: true },
+    ],
+  });
+  console.log("[Seed] ✓ Visitor tickets (5)");
+
+  // ─── 6. Payments ───
   await prisma.payment.createMany({
     data: [
-      {
-        userId: user1Id,
-        billingPeriod: "2026-03",
-        totalDuration: 1800,
-        amount: 75000,
-        status: "SUCCESS",
-        bkpayTxnId: "BKP-12345001",
-        paidAt: new Date("2026-03-31T23:30:00Z"),
-      },
-      {
-        userId: user1Id,
-        billingPeriod: "2026-04",
-        totalDuration: 720,
-        amount: 30000,
-        status: "PENDING",
-      },
-      {
-        userId: user2Id,
-        billingPeriod: "2026-03",
-        totalDuration: 1500,
-        amount: 62500,
-        status: "SUCCESS",
-        bkpayTxnId: "BKP-12345002",
-        paidAt: new Date("2026-03-31T23:35:00Z"),
-      },
-      {
-        userId: user2Id,
-        billingPeriod: "2026-04",
-        totalDuration: 600,
-        amount: 25000,
-        status: "PENDING",
-      },
-      {
-        userId: user3Id,
-        billingPeriod: "2026-04",
-        totalDuration: 480,
-        amount: 20000,
-        status: "PENDING",
-      },
+      // Tháng 03/2026 – đã thanh toán
+      { userId: user1Id, billingPeriod: "2026-03", totalDuration: 1800, amount: 75000, status: "SUCCESS", bkpayTxnId: "BKP-20260331-001", paidAt: new Date("2026-03-31T23:30:00Z") },
+      { userId: user2Id, billingPeriod: "2026-03", totalDuration: 1500, amount: 62500, status: "SUCCESS", bkpayTxnId: "BKP-20260331-002", paidAt: new Date("2026-03-31T23:35:00Z") },
+      { userId: user3Id, billingPeriod: "2026-03", totalDuration: 960,  amount: 40000, status: "SUCCESS", bkpayTxnId: "BKP-20260331-003", paidAt: new Date("2026-03-31T23:40:00Z") },
+      // Tháng 04/2026 – đã thanh toán
+      { userId: user1Id, billingPeriod: "2026-04", totalDuration: 1560, amount: 65000, status: "SUCCESS", bkpayTxnId: "BKP-20260430-001", paidAt: new Date("2026-04-30T23:30:00Z") },
+      { userId: user2Id, billingPeriod: "2026-04", totalDuration: 1200, amount: 50000, status: "SUCCESS", bkpayTxnId: "BKP-20260430-002", paidAt: new Date("2026-04-30T23:35:00Z") },
+      { userId: user3Id, billingPeriod: "2026-04", totalDuration: 720,  amount: 30000, status: "SUCCESS", bkpayTxnId: "BKP-20260430-003", paidAt: new Date("2026-04-30T23:40:00Z") },
+      // Tháng 05/2026 – đang chạy (PENDING)
+      { userId: user1Id, billingPeriod: "2026-05", totalDuration: 1245, amount: 51875, status: "PENDING" },
+      { userId: user2Id, billingPeriod: "2026-05", totalDuration: 930,  amount: 38750, status: "PENDING" },
+      { userId: user3Id, billingPeriod: "2026-05", totalDuration: 695,  amount: 28958, status: "PENDING" },
     ],
   });
-  console.log("[Seed] ✓ Sample payments (5)");
+  console.log("[Seed] ✓ Payments (9) – 6 SUCCESS, 3 PENDING tháng 05");
 
-  // ─── 5. System Log ───
-  const now = new Date();
+  // ─── 7. System Log ───
+  const now = new Date("2026-05-15T10:00:00+07:00");
   await prisma.systemLog.createMany({
     data: [
-      {
-        eventType: "admin",
-        userName: "System",
-        description: "Hệ thống khởi động – Seed hoàn tất",
-        status: "OK",
-        createdAt: new Date(now.getTime() - 720_000),
-      },
-      {
-        eventType: "entry",
-        userName: "Nguyễn Văn An",
-        description: "Vào bãi A – Slot A14",
-        status: "OK",
-        createdAt: new Date(now.getTime() - 600_000),
-      },
-      {
-        eventType: "entry",
-        userName: "Trần Thị Bảo",
-        description: "Vào bãi A – Slot A02",
-        status: "OK",
-        createdAt: new Date(now.getTime() - 480_000),
-      },
-      {
-        eventType: "exit",
-        userName: "Lê Văn Cường",
-        description: "Ra bãi A – 65 phút",
-        status: "OK",
-        createdAt: new Date(now.getTime() - 360_000),
-      },
-      {
-        eventType: "fault",
-        userName: "Gateway-B",
-        description: "Mất kết nối IoT Gateway B",
-        status: "WARN",
-        createdAt: new Date(now.getTime() - 240_000),
-      },
-      {
-        eventType: "payment",
-        userName: "Nguyễn Văn An",
-        description: "BKPay BKP-12345001 – 75,000đ",
-        status: "OK",
-        createdAt: new Date(now.getTime() - 120_000),
-      },
-      {
-        eventType: "visitor",
-        userName: "Khách",
-        description: "Cấp vé VT-000891 – 29A-99999",
-        status: "OK",
-        createdAt: new Date(now.getTime() - 60_000),
-      },
+      { eventType: "admin",   userName: "System",          description: "Hệ thống khởi động – Seed hoàn tất", status: "OK",   createdAt: new Date(now.getTime() - 86_400_000 * 7) },
+      { eventType: "entry",   userName: "Nguyễn Văn An",   description: "Vào bãi A – Cổng GATE-A – Slot A01", status: "OK",   createdAt: new Date(now.getTime() - 86_400_000 * 3) },
+      { eventType: "entry",   userName: "Trần Thị Bảo",    description: "Vào bãi A – Cổng GATE-A – Slot A02", status: "OK",   createdAt: new Date(now.getTime() - 86_400_000 * 3 + 3_600_000) },
+      { eventType: "exit",    userName: "Lê Văn Cường",    description: "Ra bãi B – 210 phút",                status: "OK",   createdAt: new Date(now.getTime() - 86_400_000 * 3 + 7_200_000) },
+      { eventType: "fault",   userName: "SENSOR-B05",      description: "Cảm biến B05 báo lỗi",              status: "WARN", createdAt: new Date(now.getTime() - 86_400_000 * 2) },
+      { eventType: "fault",   userName: "SENSOR-B05",      description: "Khôi phục cảm biến B05",            status: "OK",   createdAt: new Date(now.getTime() - 86_400_000 * 2 + 1_800_000) },
+      { eventType: "payment", userName: "Nguyễn Văn An",   description: "BKPay BKP-20260430-001 – 65,000đ",  status: "OK",   createdAt: new Date(now.getTime() - 86_400_000 * 15) },
+      { eventType: "payment", userName: "Trần Thị Bảo",    description: "BKPay BKP-20260430-002 – 50,000đ",  status: "OK",   createdAt: new Date(now.getTime() - 86_400_000 * 15 + 300_000) },
+      { eventType: "visitor", userName: "Nguyễn Bảo Vệ",   description: "Cấp vé VT-000001 – 29A-99001 – 10,000đ", status: "OK", createdAt: new Date(now.getTime() - 7_200_000) },
+      { eventType: "visitor", userName: "Nguyễn Bảo Vệ",   description: "Cấp vé VT-000002 – 51A-11222 – 30,000đ", status: "OK", createdAt: new Date(now.getTime() - 3_600_000) },
+      { eventType: "entry",   userName: "Nguyễn Văn An",   description: "Vào bãi A – Cổng GATE-A – Slot A01 (đặt trước)", status: "OK", createdAt: new Date(now.getTime() - 1_800_000) },
+      { eventType: "entry",   userName: "Trần Thị Bảo",    description: "Vào bãi A – Cổng GATE-A – Slot A02", status: "OK",  createdAt: new Date(now.getTime() - 900_000) },
+      { eventType: "admin",   userName: "Admin HCMUT",      description: "Cập nhật chính sách phí: STUDENT 2,500đ/h", status: "OK", createdAt: new Date(now.getTime() - 600_000) },
+      { eventType: "exit",    userName: "Lê Văn Cường",    description: "Ra bãi B – Cổng GATE-B – 345 phút", status: "OK",  createdAt: new Date(now.getTime() - 300_000) },
     ],
   });
-  console.log("[Seed] ✓ System log (7)");
+  console.log("[Seed] ✓ System log (14)");
 
   console.log("\n[Seed] ✅ Done!\n");
   console.log("  Login với:");

@@ -43,9 +43,9 @@ export class BillingController {
   }
 
   /**
-   * GET /api/billing/payments (Admin only)
+   * GET /api/billing/payments (Admin + Operator)
    */
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'OPERATOR')
   @Get('payments')
   getAll(@Query('status') status?: string, @Query('period') period?: string) {
     return this.billingService.getAllPayments({ status, period });

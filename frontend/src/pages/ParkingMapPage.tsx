@@ -217,10 +217,10 @@ export default function ParkingMapPage() {
             <div key={z} onClick={() => { setZone(z); setSelected(null); }}
               style={{ background: zone === z ? 'rgba(59,130,246,.12)' : '#1c2333',
                 border: `1px solid ${zone === z ? '#3b82f6' : '#2a3650'}`,
-                borderRadius: 10, padding: '10px 14px', cursor: 'pointer', marginBottom: 8 }}>
+                borderRadius: 10, padding: '14px 18px', cursor: 'pointer', marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: 14 }}>Bãi {z}</span>
-                {led && <span style={{ fontSize: 11, fontWeight: 700, color }}>{led.available}/{led.total}</span>}
+                <span style={{ fontWeight: 700, fontSize: 16 }}>Bãi {z}</span>
+                {led && <span style={{ fontSize: 13, fontWeight: 700, color }}>{led.available}/{led.total}</span>}
               </div>
               {led && (
                 <div style={{ height: 4, background: '#222b3a', borderRadius: 4, marginTop: 8 }}>
@@ -257,7 +257,7 @@ export default function ParkingMapPage() {
           {([
             { key: 'available' as FilterKey, color: '#3b82f6', label: 'Trống' },
             { key: 'occupied'  as FilterKey, color: '#64748b', label: 'Đã đỗ' },
-            { key: 'mine'      as FilterKey, color: '#3b82f6', label: 'Vị trí của bạn', bold: true },
+            { key: 'mine'      as FilterKey, color: '#22c55e', label: 'Vị trí của bạn', bold: true },
           ] as { key: FilterKey; color: string; label: string; bold?: boolean }[]).map(({ key, color, label, bold }) => (
             <div key={key} onClick={() => toggleFilter(key)}
               style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11,
@@ -320,10 +320,11 @@ export default function ParkingMapPage() {
               Không có slot nào phù hợp bộ lọc
             </div>
           )}
+
           {rows.map((r, ri) => (
-            <div key={r} style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Dãy {r}</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div key={r} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>Dãy {r}</div>
+              <div style={{ display: 'flex', gap: 5 }}>
                 {zoneSlots.filter(s => s.rowNumber === r).map(s => {
                   const isMySlot = s.slotCode === mySlotCode && zone === myZone;
                   const isRes    = reservedSlot?.id === s.id;
@@ -335,12 +336,12 @@ export default function ParkingMapPage() {
                       onClick={() => canClick ? setSelected(prev => prev?.id === s.id ? null : s) : undefined}
                       title={s.sensorId || s.slotCode}
                       style={{
-                        width: 52, height: 34, borderRadius: 7,
+                        flex: '1 1 0', minWidth: 0, height: 36, borderRadius: 6, overflow: 'hidden',
                         background: isRes ? 'rgba(34,197,94,.2)' : bg,
                         border: isRes ? '1px solid #22c55e' : border,
                         color: isRes ? '#22c55e' : color,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontFamily: 'monospace', fontSize: 10, fontWeight: 700,
+                        fontFamily: 'monospace', fontSize: mobile ? 8 : 10, fontWeight: 700,
                         cursor: canClick ? 'pointer' : 'default', transition: 'all .2s',
                         boxShadow: isSel ? `0 0 0 2px ${color}50` : isMySlot ? '0 0 0 2px rgba(59,130,246,.4)' : undefined,
                       }}>
@@ -350,10 +351,11 @@ export default function ParkingMapPage() {
                 })}
               </div>
               {ri < rows.length - 1 && (
-                <div style={{ marginTop: 10, fontSize: 10, color: '#374151', textAlign: 'center' }}>← lối đi →</div>
+                <div style={{ marginTop: 8, fontSize: 10, color: '#374151', textAlign: 'center' }}>← lối đi →</div>
               )}
             </div>
           ))}
+
         </div>
       </div>
 

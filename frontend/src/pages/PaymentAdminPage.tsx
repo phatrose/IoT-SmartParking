@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { billingApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   SUCCESS:    { bg: 'rgba(34,197,94,.15)',   color: '#22c55e', label: 'Thành công' },
@@ -11,9 +12,14 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
 function fmtMoney(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
 
 export default function PaymentAdminPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   const [payments, setPayments] = useState<any[]>([]);
   const [filter, setFilter]     = useState('');
   const [loading, setLoading]   = useState(false);
+  const [cycling, setCycling]   = useState(false);
+  const [cycleMsg, setCycleMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -25,6 +31,20 @@ export default function PaymentAdminPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleCycle = async () => {
+    const period = prompt('Nhập kỳ thanh toán (vd: 2026-05):', new Date().toISOString().slice(0, 7));
+    if (!period) return;
+    setCycling(true);
+    setCycleMsg(null);
+    try {
+      const { data } = await billingApi.triggerCycle(period);
+      setCycleMsg({ text: `Hoàn thành: ${data.processed} sinh viên, tổng ${Number(data.total).toLocaleString('vi-VN')}đ`, ok: true });
+      await load();
+    } catch (e: any) {
+      setCycleMsg({ text: e.response?.data?.message ?? 'Lỗi khi chạy chu kỳ', ok: false });
+    } finally { setCycling(false); }
+  };
 
   const filtered = payments.filter(p => {
     if (!filter) return true;
@@ -74,8 +94,35 @@ export default function PaymentAdminPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>Payment Management</h1>
-      <p style={{ fontSize: 13, color: '#64748b', marginTop: -14, marginBottom: 20 }}>Quản lý thanh toán và giao dịch</p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Payment Management</h1>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>Quản lý thanh toán và giao dịch</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {cycleMsg && (
+            <span style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8,
+              background: cycleMsg.ok ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)',
+              color: cycleMsg.ok ? '#22c55e' : '#ef4444' }}>
+              {cycleMsg.text}
+            </span>
+          )}
+          {isAdmin && (
+            <button onClick={handleCycle} disabled={cycling} style={{
+              padding: '8px 14px', borderRadius: 8, border: 'none', cursor: cycling ? 'not-allowed' : 'pointer',
+              background: cycling ? '#374151' : '#7c3aed', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+            }}>
+              {cycling ? 'Đang xử lý...' : '⚡ Tạo chu kỳ thanh toán'}
+            </button>
+          )}
+          <button onClick={load} disabled={loading} style={{
+            padding: '8px 14px', borderRadius: 8, border: '1px solid #2a3650', cursor: 'pointer',
+            background: '#1c2333', color: '#e2e8f0', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+          }}>
+            {loading ? '...' : '↻ Làm mới'}
+          </button>
+        </div>
+      </div>
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
